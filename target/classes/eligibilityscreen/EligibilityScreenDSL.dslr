@@ -1,0 +1,40 @@
+//created on: Sep 28, 2014
+package com.maximus.drools.dsl
+
+import com.psi.vida.business.to.*;
+import com.psi.vida.business.vo.EligibilityOutput;
+import com.psi.vida.business.eligibilitymanagement.processstatus.EligibilityPrescreenStatusEnum;
+import java.util.Iterator;
+import com.psi.vida.business.to.MemberStatusReasonTO
+import com.psi.vida.generatedenums.ListOfValuesUtil.AddressTypeEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.SoftDeleteEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountCompliantReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MedicaidReferralStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityNotEligibleReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberNotVerifiedReasonEnum;
+
+import com.psi.vida.util.EligibilityUtils;
+import com.psi.vida.util.rules.DateUtil;
+import java.util.ArrayList;
+import java.util.HashSet;
+import com.psi.vida.util.rules.FamilyUnit;
+
+//expander customLanguage.dsl
+
+
+
+rule "Drools DSL Test"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+    when
+        There is a PersonTO
+    then
+        Log "Find a person is a child";
+end
+
+

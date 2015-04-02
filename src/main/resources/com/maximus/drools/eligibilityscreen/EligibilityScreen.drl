@@ -1,0 +1,466 @@
+//created on: Sep 22, 2014
+package com.maximus.drools.eligibilityscreen;
+
+import com.psi.vida.business.to.*;
+import com.psi.vida.business.vo.EligibilityOutput;
+import com.psi.vida.business.eligibilitymanagement.processstatus.EligibilityPrescreenStatusEnum;
+import java.util.Iterator;
+import com.psi.vida.business.to.MemberStatusReasonTO
+import com.psi.vida.generatedenums.ListOfValuesUtil.AddressTypeEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.SoftDeleteEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountCompliantReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MedicaidReferralStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityNotEligibleReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberNotVerifiedReasonEnum;
+
+import com.psi.vida.util.EligibilityUtils;
+import com.psi.vida.util.rules.DateUtil;
+import java.util.ArrayList;
+import java.util.HashSet;
+import com.psi.vida.util.rules.FamilyUnit;
+
+
+
+//global AccountTO account
+//global java.util.List eligibilityResults
+global EligibilityOutput elgScreenOutput;
+
+
+function void addMemberStatusReason(PersonTO person, String statusReason){
+	Boolean isNotMatched = true;
+	MemberStatusReasonTO mStatusReason = new MemberStatusReasonTO();
+	mStatusReason.setStatusReason(statusReason);
+	for(int i = 0; i < person.getMemberStatusReasons().size(); i++){
+		MemberStatusReasonTO ms = person.getMemberStatusReasons().get(i);
+		if(ms.getStatusReason().equals(mStatusReason.getStatusReason()))
+		isNotMatched = false;
+		break;
+	}
+	if(isNotMatched)
+		person.getMemberStatusReasons().add(mStatusReason);
+}
+function void addElgResultStatusReason(EligibilityResultTO result, String statusReason){
+	boolean isNotMatched = true;
+	EligibilityStatusReasonTO elstatusReasonTO = new EligibilityStatusReasonTO();
+	elstatusReasonTO.setEligibilityResultId(result.getEligibilityResultId());
+	elstatusReasonTO.setStatusReason(statusReason);
+	Iterator it = result.getStatusReasons().iterator();
+	while(it.hasNext()){
+		EligibilityStatusReasonTO esrto = (EligibilityStatusReasonTO)it.next();
+		if(statusReason.equals(esrto.getStatusReason())){
+			isNotMatched = false;
+			break;
+		}
+	}
+
+	if(isNotMatched){
+		result.getStatusReasons().add(elstatusReasonTO);
+	}
+}
+
+function boolean personProvisionallyVerified(PersonTO applicant){
+	if(applicant.getProvisionalCitizenshipFlag() != null && applicant.getProvisionalCitizenshipFlag()){
+ 		return true;
+ 	}
+ 	else if (applicant.getProvisionalIdentityFlag() != null && applicant.getProvisionalIdentityFlag()){
+ 		return true;
+ 	}
+ 	return false;
+}
+
+function void setAccountStatusReason(AccountTO act, String reason){
+	AccountStatusReasonTO newReason = null;
+	if(act.getAccountStatusReasons().size() > 0){
+		newReason = act.getAccountStatusReasons().get(0);
+		newReason.setStatusReason(reason);
+	}else{
+		newReason = new AccountStatusReasonTO();
+		newReason.setStatusReason(reason);
+	}
+	act.getAccountStatusReasons().clear();
+	act.getAccountStatusReasons().add(newReason);
+}
+
+function EligibilityResultTO createElgResult(PersonTO applicant){
+	EligibilityResultTO elgResult = new EligibilityResultTO();
+	elgResult.setDateDetermined(new java.util.Date());
+	elgResult.setStatus(SoftDeleteEnum.ACTIVE.getValue());
+	elgResult.setSource("VIDA");
+	elgResult.setSchipStatus(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue());
+	elgResult.setMdcdStatus(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue());
+	elgResult.setAccountRelationshipId(applicant.getAccountRelationshipId());
+	elgResult.setMemberStatus(applicant.getStatus());
+	elgResult.setPerson(applicant);
+	return elgResult;
+}
+
+rule "eligibilityScreenInitialSetupCheck"
+	ruleflow-group "eligibilityScreenInitialSetup"
+	salience 10000
+
+    then
+        EligibilityUtils.debug( "eligibilityScreen Rule Flow group : eligibilityScreenInitialSetup");
+end
+
+rule "insertPerson"
+	ruleflow-group "eligibilityScreenInitialSetup"
+	salience 10000
+	no-loop true
+	
+    when
+        person: PersonTO(! MemberStatusEnum.DECEASED.toString().equals(status) 
+        		&& ! MemberStatusEnum.INACTIVE.toString().equals(status)) from elgScreenOutput.getAccount().getPersons()
+    then
+    	insert(person);
+        EligibilityUtils.debug("Insert into working memory person " + person.getFirstName() + " to " + DateUtil.currentAge(person.getDateOfBirth()));
+
+end
+
+rule "insertHomeAddress"
+	ruleflow-group "eligibilityScreenInitialSetup"
+	salience 10000
+	no-loop true
+	
+    when
+        address: AccountAddressTO(AddressTypeEnum.HOMEADDRESS.toString().equals(addressType)) from elgScreenOutput.getAccount().getAccountAddresses()
+    then
+    	insert(address);
+        EligibilityUtils.debug("Insert into working memory home address ") ;
+
+end
+
+rule "insertFamilyRelationships"
+	ruleflow-group "eligibilityScreenInitialSetup"
+	salience 5000
+	no-loop true
+	
+    when
+    	person: PersonTO()
+        familyRealtion : FamilyRelationshipTO() from person.getRelationships()
+    then
+    	insert(familyRealtion);
+        EligibilityUtils.debug("Insert into WM family relationships for person " + person.getFirstName()) ;
+
+end
+
+rule "insertTaxRealtionships"
+	ruleflow-group "eligibilityScreenInitialSetup"
+	salience 5000
+	no-loop true
+	
+    when
+    	person: PersonTO()
+        taxRealtion : TaxRelationshipTO() from person.getTaxRelationships()
+    then
+    	insert(taxRealtion);
+        EligibilityUtils.debug("Insert into WM tax relationships for person " + person.getFirstName()) ;
+end
+
+rule "insertEligibilityResults"
+	ruleflow-group "eligibilityScreenInitialSetup"
+	salience 5000
+	no-loop true
+	
+    when
+    	applicant: PersonTO(isChild(), dateOfBirth != null, getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
+    then
+    	insert(createElgResult(applicant));
+        EligibilityUtils.debug("Insert into WM eligibility result for person " + applicant.getFirstName()) ;
+end
+
+
+
+rule "calculateApplicantAge"
+	ruleflow-group "eligibilityScreenInitialSetup"
+	salience 100
+	no-loop true
+	
+    when
+        applicant: com.psi.vida.business.to.PersonTO(isChild(), dateOfBirth != null)
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), age == null)
+    then
+    	modify(eligibility_result){
+   			setAge(java.lang.Long.valueOf((long)(com.psi.vida.util.rules.DateUtil.currentAge(applicant.getDateOfBirth())))); 		
+    	}
+        EligibilityUtils.debug("Calculate applicant age for Eligibility Result of Applicant " + applicant.getFirstName() + " to " + com.psi.vida.util.rules.DateUtil.currentAge(applicant.getDateOfBirth()));
+
+end
+
+rule "SetPendingEligibilityInitially"
+	ruleflow-group "eligibilityScreenInitialSetup"
+    salience 100
+    no-loop true
+    
+    when
+        applicant: com.psi.vida.business.to.PersonTO(isChild())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), schipStatus == null)
+    then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue());
+    	eligibility_result.setStatus(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue());
+    	eligibility_result.setDateDetermined(new java.util.Date());
+    	eligibility_result.setEffectiveDate(new java.util.Date());
+    	update(eligibility_result);
+        EligibilityUtils.debug("Set Eligibility Result PENDING_ELIGIBILITY initially for Applicant " + applicant.getFirstName());
+
+end
+
+
+rule "DenyAgeOver19_PendingMember"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(isChild(), dateOfBirth != null, getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), getAge() != null)
+        eval (eligibility_result.getAge() >= 19
+         	&& applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+	then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+    	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+        addElgResultStatusReason(eligibility_result, EligibilityNotEligibleReasonEnum.OVERAGE.getValue());
+        update (eligibility_result);
+        addMemberStatusReason(applicant, MemberNotVerifiedReasonEnum.OVERAGE.getValue());
+        update (applicant);
+        EligibilityUtils.debug("Add Denial Reason of 'OVER_AGE' to Eligibility Result of Applicant " + applicant.getFirstName());
+
+end
+
+rule "DenyAgeOver19"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(isChild(), dateOfBirth != null, getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), getAge() != null)
+        eval (eligibility_result.getAge() >= 19
+         	&& ! applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+	then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+    	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+        addElgResultStatusReason(eligibility_result, EligibilityNotEligibleReasonEnum.OVERAGE.getValue());
+        update (eligibility_result);
+        EligibilityUtils.debug("Add Denial Reason of 'OVER_AGE' to Eligibility Result of Applicant " + applicant.getFirstName());
+
+end
+
+rule "DenyHasInsurance_PendingMember"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(isChild(), hasInsuranceFlag != null, getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
+        eval (applicant.getHasInsuranceFlag()
+         	&& applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+	then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+    	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+        addElgResultStatusReason(eligibility_result, EligibilityNotEligibleReasonEnum.HASOTHERINSURANCE.getValue());
+        update (eligibility_result);
+        addMemberStatusReason(applicant, MemberNotVerifiedReasonEnum.OTHERINSURANCE.getValue());
+        update (applicant);
+        EligibilityUtils.debug("Add Denial Reason of 'HAS_OTHER_INSURANCE' to Eligibility Result of Applicant " + applicant.getFirstName());
+
+end
+
+rule "DenyHasInsurance"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(isChild(), hasInsuranceFlag != null, getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
+        eval (applicant.getHasInsuranceFlag()
+         	&& ! applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+	then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+    	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+        addElgResultStatusReason(eligibility_result, EligibilityNotEligibleReasonEnum.HASOTHERINSURANCE.getValue());
+        update (eligibility_result);
+        EligibilityUtils.debug("Add Denial Reason of 'HAS_OTHER_INSURANCE' to Eligibility Result of Applicant " + applicant.getFirstName());
+
+end
+
+rule "DenyNotApplying_PendingMember"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(isChild())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
+        eval (applicant.getApplyingForBenefitsFlag() != null && ! applicant.getApplyingForBenefitsFlag()
+         	&& applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+	then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+    	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+        addElgResultStatusReason(eligibility_result, EligibilityNotEligibleReasonEnum.NOTAPPLYINGFORBENEFITS.getValue());
+        update (eligibility_result);
+        addMemberStatusReason(applicant, MemberNotVerifiedReasonEnum.NOTAPPLYINGFORBENEFITS.getValue());
+        update (applicant);
+        EligibilityUtils.debug("Add Denial Reason of 'HAS_OTHER_INSURANCE' to Eligibility Result of Applicant " + applicant.getFirstName());
+
+end
+
+rule "DenyNotApplying"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(isChild())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
+        eval (applicant.getApplyingForBenefitsFlag() != null && ! applicant.getApplyingForBenefitsFlag()
+         	&& ! applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+	then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+    	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+        addElgResultStatusReason(eligibility_result, EligibilityNotEligibleReasonEnum.NOTAPPLYINGFORBENEFITS.getValue());
+        update (eligibility_result);
+        EligibilityUtils.debug("Add Denial Reason of 'HAS_OTHER_INSURANCE' to Eligibility Result of Applicant " + applicant.getFirstName());
+
+end
+
+rule "DenyOutOfState_PendingMember"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(isChild(), getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
+        address: AccountAddressTO(state != null)
+        eval ( ! address.getState().equals("GA")
+         	&& applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+	then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+    	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+        addElgResultStatusReason(eligibility_result, EligibilityNotEligibleReasonEnum.OUTOFSTATE.getValue());
+        update (eligibility_result);
+        addMemberStatusReason(applicant, MemberNotVerifiedReasonEnum.OUTOFSTATE.getValue());
+        update (applicant);
+        EligibilityUtils.debug("Add Denial Reason of 'OUT_OF_STATE' to Eligibility Result of Applicant " + applicant.getFirstName());
+
+end
+
+rule "DenyOutOfState"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(isChild(), getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
+        address: AccountAddressTO(state != null)
+        eval (! address.getState().equals("GA")
+         	&& ! applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+	then
+    	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+    	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
+        addElgResultStatusReason(eligibility_result, EligibilityNotEligibleReasonEnum.OUTOFSTATE.getValue());
+        update (eligibility_result);
+        EligibilityUtils.debug("Add Denial Reason of 'OUT_OF_STATE' to Eligibility Result of Applicant " + applicant.getFirstName());
+
+end
+
+rule "DenyParentApplying"
+	ruleflow-group "eligibilityScreenSCHIPDetermination"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO(! isChild(), getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
+        eval (! applicant.getReferralStatus().equals(MedicaidReferralStatusEnum.SENT_FFM.getValue()))
+        
+	then
+		applicant.setReferralStatus(MedicaidReferralStatusEnum.SENT_FFM.getValue());
+		update(applicant);
+        EligibilityUtils.debug("Set parent referral status to SENT_FFM on applying benefit parent " + applicant.getFirstName());
+
+end
+
+
+
+rule "MemberFromPendingToNotVerified"
+	ruleflow-group "eligibilityScreenMemberStatus"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant: com.psi.vida.business.to.PersonTO( isChild())
+	    eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), 
+	    	EligibilityStatusEnum.NOTELIGIBLE.getValue().equals(schipStatus))
+        eval ( MemberStatusEnum.PENDINGVERIFICATION.getValue().equals(applicant.getStatus()) ||
+        		(MemberStatusEnum.MEMBERVERIFIED.getValue().equals(applicant.getStatus()) && 
+        			personProvisionallyVerified(applicant)))
+        
+	then
+		applicant.setStatus(MemberStatusEnum.NOTVERIFIED.getValue());
+		update(applicant);
+		eligibility_result.setMemberStatus(MemberStatusEnum.NOTVERIFIED.getValue());
+		update(eligibility_result);
+        EligibilityUtils.debug("Member Status changed from PENDING_VERIFICATION to NOT_VERIFIED on applicant " + applicant.getFirstName());
+
+end
+
+rule "eligibilityScreenStatusCheck"
+	ruleflow-group "eligibilityScreenStatus"
+	salience 10000
+
+    then
+        EligibilityUtils.debug( "eligibilityScreen Rule Flow group : eligibilityScreenStatus");
+end
+
+rule "RejectAccount"
+	ruleflow-group "eligibilityScreenStatus"
+	salience 10000
+	
+	when
+	    exists (EligibilityResultTO(EligibilityStatusEnum.NOTELIGIBLE.getValue().equals(schipStatus)))
+	    not (EligibilityResultTO(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue().equals(schipStatus)))
+        
+	then
+		elgScreenOutput.setLiteSignature(EligibilityPrescreenStatusEnum.PRESCREEN_REJECT_ACCOUNT.getValue());
+        EligibilityUtils.debug("Reject Account");
+
+end
+
+rule "UpdateAccountStatus"
+	ruleflow-group "eligibilityScreenStatus"
+	salience 100
+	
+	when
+
+	    eval( (AccountStatusEnum.PENDINGCOMPLIANCE.getValue().equals(elgScreenOutput.getAccount().getAccountStatus()) ||
+			AccountStatusEnum.REDETERMINECOMPLIANCE.getValue().equals(elgScreenOutput.getAccount().getAccountStatus()))
+	    &&EligibilityPrescreenStatusEnum.PRESCREEN_REJECT_ACCOUNT.getValue().equals(elgScreenOutput.getLiteSignature()))
+        
+	then
+		elgScreenOutput.getAccount().setAccountStatus(AccountStatusEnum.COMPLIANT.getValue());
+        setAccountStatusReason(elgScreenOutput.getAccount(), AccountCompliantReasonEnum.INCOMEVERIFICATIONWAIVED.getValue());
+        EligibilityUtils.debug("Account status: COMPLIANT.  status reason: INCOME_VERIFICATION_WAIVED ");
+
+end
+
+rule "CollectDenialResults"
+	ruleflow-group "eligibilityScreenStatus"
+	salience 100
+	
+	when
+
+	    result: EligibilityResultTO(EligibilityStatusEnum.NOTELIGIBLE.getValue().equals(schipStatus))
+        
+	then
+		elgScreenOutput.getResults().add(result);
+        EligibilityUtils.debug("Add NOT_ELIGIBLE result for elgScreenOutput ");
+
+end
+
+

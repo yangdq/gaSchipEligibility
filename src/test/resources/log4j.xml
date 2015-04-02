@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE log4j:configuration PUBLIC "log4j.dtd" "log4j.dtd" > 
+<log4j:configuration  xmlns:log4j="http://jakarta.apache.org/log4j/" debug="true" >
+ <appender name="ConsoleAppender" class="org.apache.log4j.ConsoleAppender">
+  <layout class="org.apache.log4j.PatternLayout">
+   <param name="ConversionPattern" value="%d{yyyy-MM-dd hh:mm} | %p | %c | %X{user} | %X{td} | %X{id} | %m%n"/>
+  </layout>
+ </appender>
+ <appender name="VidaAppender" class="org.apache.log4j.RollingFileAppender">
+   <param name="MaxFileSize" value="10MB" />
+   <param name="File" value="vida.log" />
+   <param name="MaxBackupIndex" value="10" />
+  <layout class="org.apache.log4j.PatternLayout">
+     <param name="ConversionPattern" value="%d{yyyy-MM-dd hh:mm} | %p | %c | %X{user} | %X{td} | %X{id} | %m%n"/>
+  </layout>
+ </appender>
+ <appender name="ChunkingAppender" class="org.apache.log4j.RollingFileAppender">
+   <param name="MaxFileSize" value="10MB" />
+   <param name="File" value="chunking.log" />
+   <param name="MaxBackupIndex" value="1" /> 
+ <layout class="org.apache.log4j.PatternLayout">
+     <param name="ConversionPattern" value="%d{yy-MM-dd hh:mm:ss} | %p | %t | %m%n"/>
+  </layout>
+ </appender>
+
+ 
+ <!-- Log all events asynchronously. -->
+<appender name="VidaAppenderA" class="org.apache.log4j.AsyncAppender">
+   <appender-ref ref="VidaAppender" />
+</appender>
+<appender name="ChunkingAppenderA" class="org.apache.log4j.AsyncAppender">
+   <appender-ref ref="ChunkingAppender" />
+</appender>
+<appender name="ConsoleAppenderA" class="org.apache.log4j.AsyncAppender">
+   <appender-ref ref="ConsoleAppender" />
+</appender>
+
+<!-- Uncomment the following logger to show SQL statements  -->
+<!--
+<logger name="java.sql" >
+  <level value="DEBUG"/>
+</logger>
+-->
+
+<!-- Set PSI loggers to log to console and vida.log -->
+<logger name="com.psi" >
+  <level value="DEBUG"/>
+  <appender-ref ref="VidaAppenderA"/>
+  <appender-ref ref="ConsoleAppender" />
+</logger>
+
+<logger name="jrules" >
+  <level value="DEBUG"/>
+  <appender-ref ref="VidaAppenderA"/>
+  <appender-ref ref="ConsoleAppender" />
+</logger>
+
+<!-- Chunking metrics to chunking appender -->
+<logger name="chunkmetrics" additivity="false">
+  <level value="INFO"/>
+  <appender-ref ref="ChunkingAppenderA" />
+</logger>
+
+<!-- Default to console appender. -->
+ <root>  
+  <priority value="NONE" />
+  <appender-ref ref="VidaAppenderA"/>
+ </root>
+</log4j:configuration>

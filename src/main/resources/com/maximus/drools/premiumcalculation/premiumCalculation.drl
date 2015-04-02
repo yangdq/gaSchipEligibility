@@ -1,0 +1,341 @@
+//created on: Mar 27, 2015
+package com.maximus.drools.premiumcalculation;
+
+//list any import classes here.
+import com.psi.vida.business.to.*;
+import com.psi.vida.business.vo.PremiumCalOutput;
+import com.psi.vida.business.vo.PremiumCalInput;
+import com.psi.vida.util.rules.PremiumUnit;
+import com.psi.vida.business.eligibilitymanagement.processstatus.EligibilityPrescreenStatusEnum;
+import java.util.Iterator;
+import com.psi.vida.business.to.MemberStatusReasonTO
+import com.psi.vida.generatedenums.ListOfValuesUtil.AddressTypeEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.SoftDeleteEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountCompliantReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MedicaidReferralStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityNotEligibleReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberNotVerifiedReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.PremiumChangeReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.RelationshipToParentEnum;
+
+import com.psi.vida.util.EligibilityUtils;
+import com.psi.vida.util.rules.DateUtil;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Date;
+import java.lang.Long;
+import com.psi.vida.util.rules.FamilyUnit;
+import com.maximus.rule.internal.DroolsInternal;
+
+
+//declare any global variables here
+
+global List<PremiumUnit> premiumUnits;
+global PremiumCalOutput premiumOutput;
+global PremiumCalInput input;
+global Date specifiedDate;
+
+
+function Date initializeSpecifiedDate(Date specDate){
+	if(specDate == null){
+		specDate = DateUtil.getBeginOfMonth(new Date());
+	}else{
+		specDate = DateUtil.getBeginOfMonth(specDate);
+	}
+	return specDate;
+}
+
+function PremiumUnit createMonthlyPremiumUnit(Date premiumMonth){
+	PremiumUnit premiumUnit = new PremiumUnit();
+	MonthlyPremiumTO monthlyPremium = new MonthlyPremiumTO();
+	premiumUnit.setMonthlyPremium(monthlyPremium);
+
+	premiumUnit.setMonth(premiumMonth);
+	monthlyPremium.setCoverageStartDate(premiumMonth);
+	monthlyPremium.setPremiumOverWriteFlag(false);
+	return premiumUnit;
+}
+
+function boolean isNotFosterChild(PersonTO child){
+	if(child.getRelationships() != null && child.getRelationships().size() > 0){
+		for(FamilyRelationshipTO frto: child.getRelationships()){
+			if(RelationshipToParentEnum.FOSTERCHILD.getValue().equals(frto.getRelationshipType()))
+				return false;
+		}
+	}
+	return true;
+
+}
+
+function boolean tribalMembershipVerified(PersonTO child){
+	if(child.getTribalMemberVerifiedFlag() == null || ! child.getTribalMemberVerifiedFlag())
+		return false;
+	else
+		return true;
+}
+
+function int retroEnrolleeCount(List childrenRequestingRetro, AccountTO account, Date specDate){
+	int totalEnrolled = 0;
+	if(childrenRequestingRetro != null){
+		for(int i = 0 ; i < childrenRequestingRetro.size(); i++){
+			Long partyId = (Long)childrenRequestingRetro.get(i);
+			EligibilityUtils.info("Search Child with party Id " + partyId);
+			for(int j = 0 ; j < account.getPersons().size() ; j++){
+				PersonTO person = (PersonTO)account.getPersons().get(j);
+				if(partyId.equals(person.getPartyId())){
+					EligibilityUtils.info("Find Child with party Id " + partyId);
+					if(DateUtil.ageOnDate(person.getDateOfBirth(), specDate) >= 6 && 
+						(person.getTribalMemberVerifiedFlag() == null || person.getTribalMemberVerifiedFlag() == false) && 
+						EligibilityUtils.isNotFosterChild(person)){
+						person.setHasNonZeroPremiumFlag(true);
+						totalEnrolled = totalEnrolled + 1;
+						EligibilityUtils.info("Count " + person.getFirstName() + " to the total enrolled children size["+totalEnrolled+"]");
+					}else{
+						EligibilityUtils.info("Not count " + person.getFirstName() + " to the total enrolled children size because the "+
+						"child is under 6("+DateUtil.currentAge(person.getDateOfBirth())+"), or the child is AMERICAN_INDIAN or ALASKA_NATIVE, or the child is FOSTER CHILD.");
+					}
+				}
+			}
+		}
+		//totalEnrolled = childrenEnrolled.size();
+		EligibilityUtils.debug("The count of total enrolled children is " + totalEnrolled);
+	}
+	return totalEnrolled;
+}
+
+// premiumInitialSetUp rule task
+
+rule "premiumInitialSetup"
+	ruleflow-group "premiumInitialSetUp"
+	salience 100000
+
+    then
+        premiumUnits = EligibilityUtils.generatePremiumUnits(input.getAccount(), 24);
+        for(Object unit : premiumUnits){
+        	PremiumUnit pu = (PremiumUnit) unit;
+        	insert(pu);
+        	premiumOutput.getMonthlyPremiums().add(pu.getMonthlyPremium());
+        	EligibilityUtils.debug("Insert into WM premiumUnit of size " + premiumUnits.size()) ;
+        }
+        specifiedDate = initializeSpecifiedDate(specifiedDate);
+        int retroCount = retroEnrolleeCount(input.getChildrenEnrolled(), input.getAccount(), specifiedDate);
+        EligibilityUtils.debug( "Retro Enrolled Count is " + retroCount); 
+        //retroPlanCode = input.getPlanType();
+        DroolsInternal interium = new DroolsInternal();
+        interium.setCurrentMonth(DateUtil.getBeginOfMonth(new Date()));
+        interium.setLowestFPLPct(2000);
+        interium.setRetroCount(retroCount);
+        EligibilityUtils.info("Interium retro count is " + interium.getRetroCount());
+        insert(interium);
+        // Place holder for premium preview
+        insert(createMonthlyPremiumUnit(interium.getCurrentMonth()));
+        //TODO: Check if this is required
+        insert(input.getAccount());
+        insert(input);
+        EligibilityUtils.debug( "premium Rule Flow group : premiumInitialSetup: premium units size " + premiumUnits.size() + 
+        ", specifiedDate, retor totalEnrolled");
+        
+end
+
+rule "insertPerson"
+	ruleflow-group "premiumInitialSetUp"
+	salience 5000
+	no-loop true
+	
+    when
+        person: PersonTO(! MemberStatusEnum.DECEASED.toString().equals(status) 
+        		&& ! MemberStatusEnum.INACTIVE.toString().equals(status) && isChild()) from input.getAccount().getPersons()
+    then
+    	insert(person);
+        EligibilityUtils.debug("Insert into working memory child " + person.getFirstName() + " age " + DateUtil.currentAge(person.getDateOfBirth()));
+
+end
+
+rule "insertEligibilityResult"
+	ruleflow-group "premiumInitialSetUp"
+	salience 5000
+	no-loop true
+	
+    when
+        elgResult: EligibilityResultTO() from input.getResults()
+    then
+    	insert(elgResult);
+        EligibilityUtils.debug("Insert into working memory EligibilityResult ") ;
+
+end
+
+rule "insertOriginalPremiums"
+	ruleflow-group "premiumInitialSetUp"
+	salience 5000
+	no-loop true
+	
+    when
+        originalPremiumNextTwoMonths : MonthlyPremiumTO() from input.getOriginalPremiums()
+    then
+    	insert(originalPremiumNextTwoMonths);
+        EligibilityUtils.debug("Insert into WM original premiums") ;
+
+end
+
+
+/*
+rule "countEligibleChildren"
+	ruleflow-group "premiumInitialSetUp"
+	salience 100
+	no-loop true
+	
+    when
+        applicant: com.psi.vida.business.to.PersonTO(isChild())
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), schipStatus.equals("ELIGIBLE"))
+        eval(DateUtil.ageOnDate(applicant.getDateOfBirth(), specifiedDate) >= 6 &&
+            (applicant.getTribalMemberVerifiedFlag() == null || applicant.getTribalMemberVerifiedFlag() == false) &&
+            EligibilityUtils.isNotFosterChild(applicant))
+    then
+		totalEligibleChildren ++;
+		update(totalEligibleChildren);
+        EligibilityUtils.debug("Increase total eligible children count by 1 to " + totalEligibleChildren);
+	    
+end
+*/
+
+rule "detectAgeTurn6Reason"
+	ruleflow-group "premiumInitialSetUp"
+	salience 10
+	no-loop true
+	
+    when
+         premium_unit1: PremiumUnit()
+         premium_unit2: PremiumUnit(this != premium_unit1)
+         eval ( DateUtil.getNumberOfMonthsBetween(premium_unit1.getMonth(), premium_unit2.getMonth()) == 1
+         	&& (premium_unit2.getTotalChildren() - premium_unit1.getTotalChildren()) > 0
+         	&& premium_unit1.getTotalChildren() < 2)
+    then
+         premium_unit2.getMonthlyPremium().setChangeReason(PremiumChangeReasonEnum.CHILDTURNS6.getValue());
+         EligibilityUtils.debug("Detected premium increase due to child turn 6");
+	    
+end
+
+rule "findLowestFPLPercentage"
+	ruleflow-group "premiumInitialSetUp"
+	salience 100
+	no-loop true
+	
+    when
+         child: PersonTO(isNotFosterChild(this))
+         interium: DroolsInternal();
+         eligibility_result: EligibilityResultTO( EligibilityStatusEnum.ELIGIBLE.getValue().equals(schipStatus), child.equals(person),
+         											xxiIncome != null)
+
+         eval((eligibility_result.getXxiIncome().doubleValue() * 100 / eligibility_result.getXxiFamilyFpl().doubleValue()) 
+         	< interium.getLowestFPLPct())
+    then
+         interium.setLowestFPLPct((int)(eligibility_result.getXxiIncome() * 100 / eligibility_result.getXxiFamilyFpl()));
+		 update (interium);
+         EligibilityUtils.debug("Decrease the lowest FPL pecentage to XIX value of " + interium.getLowestFPLPct());
+	    
+end
+
+rule "monthlyPremiumUnitChildCount"
+	ruleflow-group "premiumInitialSetUp"
+	salience 50
+	no-loop true
+	
+    when
+    	 child: PersonTO(isNotFosterChild(this))
+         eligibility_result: EligibilityResultTO(EligibilityStatusEnum.ELIGIBLE.getValue().equals(schipStatus), child.equals(person));
+         premium_unit: PremiumUnit();
+         eval ( DateUtil.ageOnDate(child.getDateOfBirth(), premium_unit.getMonth()) >= 6
+         	&& !tribalMembershipVerified(child)
+         	&& !premium_unit.getChildrenForPremium().contains(child) );
+    then
+         premium_unit.addChild(child);
+         update (premium_unit);
+         EligibilityUtils.debug("Add child " + child.getFirstName() + " to premium unit of month " + premium_unit.getMonth());
+	    
+end
+
+rule "childrenCountForPremiumCal"
+	ruleflow-group "premiumInitialSetUp"
+	salience 1
+	no-loop true
+	
+    when
+    	 interium: DroolsInternal();
+    then
+         EligibilityUtils.debug("Retro Cov Premium head count is " + interium.getRetroCount());
+         EligibilityUtils.debug("Retro Cov Plan Type is " + input.getPlanType());
+end
+
+rule "PlanTypeIncreaseDefer"
+	ruleflow-group "premiumLifeCycle"
+	salience 10000
+	no-loop true
+	
+    when
+         original_premium: MonthlyPremiumTO()
+         premium_unit: PremiumUnit(DateUtil.isSameMonth(original_premium.getCoverageStartDate(), monthlyPremium.getCoverageStartDate()),
+         	monthlyPremium.getPlanType() != null) from premiumUnits
+         eval (EligibilityUtils.isPlanTypeHigher(premium_unit.getMonthlyPremium(), original_premium))
+    then
+         premium_unit.getMonthlyPremium().setPlanType(original_premium.getPlanType());
+         update( premium_unit);
+         EligibilityUtils.debug("Defer the increase of plan type and keep it to " + original_premium.getPlanType() + 
+         " on month " + original_premium.getCoverageStartDate().toString());
+
+	    
+end
+
+
+rule "EnrolleeCountIncreaseDefer"
+	ruleflow-group "premiumLifeCycle"
+	salience 10000
+	no-loop true
+	
+    when
+         original_premium: MonthlyPremiumTO()
+         premium_unit: PremiumUnit(DateUtil.isSameMonth(original_premium.getCoverageStartDate(), monthlyPremium.getCoverageStartDate()))
+         	from premiumUnits
+         eval ((premium_unit.getTotalChildren() > original_premium.countEnrollee()
+         	&& original_premium.countEnrollee() < 2));
+    then
+         premium_unit.setTotalChildren(original_premium.countEnrollee());
+         premium_unit.getMonthlyPremium().setChildrenChargedPremium(original_premium.getChildrenChargedPremium());
+         update (premium_unit);
+         EligibilityUtils.debug("Defer the increase of enrollee count and keep it to " + original_premium.countEnrollee() + 
+         " on month " + original_premium.getCoverageStartDate().toString());    
+end
+
+rule "PremiumPreviewAmount"
+	ruleflow-group "premiumAmount"
+	salience 10
+	no-loop true
+	
+    when
+         //premium_preview: PremiumUnit(DateUtil.isSameMonth(month, DateUtil.getBeginOfMonth(new Date())))
+         interium: DroolsInternal();
+         premium_preview: PremiumUnit()
+         eval( DateUtil.isSameMonth(premium_preview.getMonth(), interium.getCurrentMonth()))
+    then
+         premiumOutput.setFamilyPremium(premium_preview.getMonthlyPremium().getAmountDue());
+         premiumOutput.setPremiumPlan(premium_preview.getMonthlyPremium().getPlanType());
+         EligibilityUtils.debug("Set the premium preview result to Plan : " + premiumOutput.getPremiumPlan() + 
+         " Amt: " + premiumOutput.getFamilyPremium());    
+end
+
+rule "RetroPremiumAmount"
+	ruleflow-group "premiumRetroPremium"
+	salience 10
+	no-loop true
+	
+    when
+         interium: DroolsInternal();
+    then
+    	premiumOutput.setFamilyPremium(interium.getPremiumAmount());
+    	premiumOutput.setPremiumPlan(input.getPlanType());
+        EligibilityUtils.debug("Retro Premium Amount output is : $" + premiumOutput.getFamilyPremium());    
+end
+

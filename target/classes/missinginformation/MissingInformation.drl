@@ -1,0 +1,1013 @@
+//created on: Sep 22, 2014
+package com.maximus.missinginformation
+
+import com.psi.vida.business.to.*;
+import com.psi.vida.business.vo.MissingInformationOutput;
+import com.psi.vida.business.vo.MissingInformationInput;
+import com.psi.vida.business.eligibilitymanagement.processstatus.EligibilityPrescreenStatusEnum;
+import java.util.Iterator;
+import com.maximus.rule.internal.MissingInforInternalStatus;
+
+import com.psi.vida.business.to.MemberStatusReasonTO
+import com.psi.vida.generatedenums.ListOfValuesUtil.AddressTypeEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.SoftDeleteEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountCompliantReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MedicaidReferralStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityNotEligibleReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberNotVerifiedReasonEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.MemberRoleEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.VerificationStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.ExpenseEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.UsCitizenshipStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.ContactInfoTypeEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.PrimaryRaceEnum;
+import com.psi.vida.business.clearance.MissingInfoEnum;
+
+import com.psi.vida.util.EligibilityUtils;
+import com.psi.vida.util.rules.DateUtil;
+import java.util.ArrayList;
+import java.util.HashSet;
+import com.psi.vida.util.rules.FamilyUnit;
+
+
+global MissingInforInternalStatus errorCode;
+
+global MissingInformationOutput missingInfoOutput;
+global Long totalParents;
+
+global Boolean hasIncomepleteIncome;
+global Boolean hasVerifiedIncome;
+global Boolean incompletePersonBasicInfor;
+global Boolean incomepleteMailingAddress;
+
+
+function void addMemberStatusReason(PersonTO person, String statusReason){
+	Boolean isNotMatched = true;
+	MemberStatusReasonTO mStatusReason = new MemberStatusReasonTO();
+	mStatusReason.setStatusReason(statusReason);
+	for(int i = 0; i < person.getMemberStatusReasons().size(); i++){
+		MemberStatusReasonTO ms = person.getMemberStatusReasons().get(i);
+		if(ms.getStatusReason().equals(mStatusReason.getStatusReason()))
+		isNotMatched = false;
+		break;
+	}
+	if(isNotMatched)
+		person.getMemberStatusReasons().add(mStatusReason);
+}
+function void addElgResultStatusReason(EligibilityResultTO result, String statusReason){
+	boolean isNotMatched = true;
+	EligibilityStatusReasonTO elstatusReasonTO = new EligibilityStatusReasonTO();
+	elstatusReasonTO.setEligibilityResultId(result.getEligibilityResultId());
+	elstatusReasonTO.setStatusReason(statusReason);
+	Iterator it = result.getStatusReasons().iterator();
+	while(it.hasNext()){
+		EligibilityStatusReasonTO esrto = (EligibilityStatusReasonTO)it.next();
+		if(statusReason.equals(esrto.getStatusReason())){
+			isNotMatched = false;
+			break;
+		}
+	}
+
+	if(isNotMatched){
+		result.getStatusReasons().add(elstatusReasonTO);
+	}
+}
+
+function boolean personProvisionallyVerified(PersonTO applicant){
+	if(applicant.getProvisionalCitizenshipFlag() != null && applicant.getProvisionalCitizenshipFlag()){
+ 		return true;
+ 	}
+ 	else if (applicant.getProvisionalIdentityFlag() != null && applicant.getProvisionalIdentityFlag()){
+ 		return true;
+ 	}
+ 	return false;
+}
+
+function void setAccountStatusReason(AccountTO act, String reason){
+	AccountStatusReasonTO newReason = null;
+	if(act.getAccountStatusReasons().size() > 0){
+		newReason = act.getAccountStatusReasons().get(0);
+		newReason.setStatusReason(reason);
+	}else{
+		newReason = new AccountStatusReasonTO();
+		newReason.setStatusReason(reason);
+	}
+	act.getAccountStatusReasons().clear();
+	act.getAccountStatusReasons().add(newReason);
+}
+
+function void addAccountMissingFields(AccountTO act, String fields){
+	if(act.getMissingInformation() == null){
+		act.setMissingInformation(fields);
+	}
+	else{
+		act.setMissingInformation(act.getMissingInformation() + "," + fields);
+	}
+}
+
+function void addPersonMissingFields(PersonTO per, String fields){
+	if(per.getMissingInformation() == null){
+		per.setMissingInformation(fields);
+	}
+	else{
+		per.setMissingInformation(per.getMissingInformation() + "," + fields);
+	}
+}
+
+function boolean missingParentOne(AccountTO act){
+	boolean missingPOne = true;
+	for(PersonTO pers : act.getPersons()){
+		if(pers.getRoles().size() > 0){
+			for(MemberRoleTO role : pers.getRoles()){
+				if(MemberRoleEnum.PRINCIPAL.getValue().equals(role.getMemberRole())){
+					missingPOne = false;
+				}
+			}
+		}
+	}
+	return missingPOne;
+}
+
+function boolean isParentOne(PersonTO pers){
+	boolean isPOne = false;
+	for(MemberRoleTO role : pers.getRoles()){
+		if(MemberRoleEnum.PRINCIPAL.getValue().equals(role.getMemberRole())){
+			isPOne = true;
+			break;
+		}
+	}
+	return isPOne;
+}
+
+function boolean isBlank(Object obj){
+	if (obj instanceof String){
+		if(obj == null || "".equals(obj)){
+			return true;
+		}
+	}else{
+		if(obj == null){
+			return true;
+		}
+	}
+	return false;
+}
+
+function boolean citizenshipNotVerified(PersonTO person){
+	if(person.getDeclaredUsCitizenFlag() == null || person.getDeclaredUsCitizenFlag() == false){
+		if(UsCitizenshipStatusEnum.NOTQUALIFIEDNONCITIZEN.getValue().equals(person.getUsCitizenshipStatus())){
+			return new Boolean(false);
+		}
+		if(UsCitizenshipStatusEnum.QUALIFIEDCITIZEN.getValue().equals(person.getUsCitizenshipStatus())){
+			return new Boolean(false);
+		}
+	}
+	if(person.getUsCitizenshipVerifiedFlag() != null && person.getUsCitizenshipVerifiedFlag()){
+		return new Boolean(false);
+	}
+	else{
+		return new Boolean(true);
+	}
+}
+
+rule "missingInfoInitialSetupCheck"
+	ruleflow-group "missingInfoInitialSetup"
+	salience 10000
+
+    then
+        EligibilityUtils.debug( "missing information Rule Flow group : missingInfoInitialSetup");
+end
+
+rule "insertPerson"
+	ruleflow-group "missingInfoInitialSetup"
+	salience 10000
+    when
+        person: PersonTO(! MemberStatusEnum.DECEASED.toString().equals(status) 
+        		&& ! MemberStatusEnum.INACTIVE.toString().equals(status)) from missingInfoOutput.getAccount().getPersons()
+    then
+    	insert(person);
+        EligibilityUtils.debug("Insert into working memory person " + person.getFirstName() + " to " + DateUtil.currentAge(person.getDateOfBirth()));
+
+end
+
+rule "insertAddress"
+	ruleflow-group "missingInfoInitialSetup"
+	salience 10000
+    when
+        address: AccountAddressTO() from missingInfoOutput.getAccount().getAccountAddresses()
+    then
+    	insert(address);
+        EligibilityUtils.debug("Insert into working memory home address of type " + address.getAddressType()) ;
+
+end
+
+rule "insertPersonIncomes"
+	ruleflow-group "missingInfoInitialSetup"
+	salience 5000
+    when
+    	person: PersonTO()
+        income : IncomeTO() from person.getIncomes()
+    then
+    	insert(income);
+        EligibilityUtils.debug("Insert into WM income for person " + person.getFirstName()) ;
+
+end
+
+rule "insertPersonExpenses"
+	ruleflow-group "missingInfoInitialSetup"
+	salience 5000
+    when
+    	person: PersonTO()
+        expense : ExpenseTO() from person.getExpenses()
+    then
+    	insert(expense);
+        EligibilityUtils.debug("Insert into WM expense for person " + person.getFirstName()) ;
+end
+
+rule "insertAccountIncomes"
+	ruleflow-group "missingInfoInitialSetup"
+	salience 5000
+    when
+        income : IncomeTO() from missingInfoOutput.getAccount().getAccountIncomes()
+    then
+    	insert(income);
+        EligibilityUtils.debug("Insert into WM income for at account level") ;
+
+end
+
+rule "insertAccountExpenses"
+	ruleflow-group "missingInfoInitialSetup"
+	salience 5000
+    when
+        expense : ExpenseTO() from missingInfoOutput.getAccount().getAccountExpenses()
+    then
+    	insert(expense);
+        EligibilityUtils.debug("Insert into WM expense at account level") ;
+end
+
+
+/*
+accountMissingInfo
+*/
+
+rule "AccountMissingApplicant"
+	ruleflow-group "accountMissingInfo"
+	salience 10000
+	no-loop true
+
+	when
+		not PersonTO(isChild())
+
+    then
+    	addAccountMissingFields(missingInfoOutput.getAccount(), "missingChildFLName,,missingChildDOB,,missingChildSex,");
+    	errorCode.setAccountError(true);
+        EligibilityUtils.debug( "MISSING_ACCOUNT_INFO: Account is missing child.");
+end
+
+rule "AccountMissingParentOne"
+	ruleflow-group "accountMissingInfo"
+	salience 10000
+	
+	when
+		not PersonTO(isParentOne(this))
+		
+    then
+    	addAccountMissingFields(missingInfoOutput.getAccount(), "missingParentFLName,,missingParentSSN,");
+    	errorCode.setAccountError(true);
+        EligibilityUtils.debug( "MISSING_ACCOUNT_INFO: Account is missing parent one.");
+end
+
+rule "ChildMissingMinimalInfo"
+	ruleflow-group "accountMissingInfo"
+	salience 10000
+	
+	when
+		child: PersonTO(isChild())
+		eval(! (( !isBlank(child.getFirstName()) && ! isBlank(child.getLastName()) && ! isBlank(child.getDateOfBirth())) ||
+		  (! isBlank(child.getLastName()) && ! isBlank(child.getSsn()))) )
+		
+    then
+    	errorCode.setAccountError(true);
+    	incompletePersonBasicInfor = true;
+        EligibilityUtils.debug( "MISSING_ACCOUNT_INFO: Account is missing child's LN/SSN or DOB/FN/LN.");
+end
+
+rule "ParentMissingMinimalInfo"
+	ruleflow-group "accountMissingInfo"
+	salience 10000
+
+	when
+		parent: PersonTO(! isChild())
+		eval(! (( !isBlank(parent.getFirstName()) && ! isBlank(parent.getLastName()) && ! isBlank(parent.getDateOfBirth())) ||
+		  (! isBlank(parent.getLastName()) && ! isBlank(parent.getSsn()))) )
+
+    then
+    	errorCode.setAccountError(true);
+    	incompletePersonBasicInfor = true;
+        EligibilityUtils.debug( "MISSING_ACCOUNT_INFO: Account is missing parent's LN/SSN or DOB/FN/LN.");
+end
+
+rule "ScanVerifiedIncome"
+	ruleflow-group "accountMissingInfo"
+	salience 10000
+	
+	when
+		person : PersonTO()
+		income : IncomeTO(VerificationStatusEnum.VERIFIED.value.equals(verficationStatus)) from person.getIncomes()
+
+    then
+    	hasVerifiedIncome = true;
+        EligibilityUtils.debug( "Account has VERIFIED income");
+end
+
+/*
+personMissingInfo
+*/
+
+rule "ApplicantMissingFLNames"
+	ruleflow-group "personMissingInfo"
+	salience 100
+	no-loop true
+	
+	when
+	    child: com.psi.vida.business.to.PersonTO(isChild(), (isBlank(firstName) || isBlank(lastName)))
+        eval (incompletePersonBasicInfor)
+	then
+		addPersonMissingFields(child, "missingChildFLName,");
+        EligibilityUtils.debug("Child is missing first name or last name.");
+end
+
+rule "ParentMissingFLNames"
+	ruleflow-group "personMissingInfo"
+	salience 100
+	no-loop true
+	
+	when
+	    parent: com.psi.vida.business.to.PersonTO(! isChild(), (isBlank(firstName) || isBlank(lastName)))
+        eval (incompletePersonBasicInfor != null && incompletePersonBasicInfor)
+	then
+		addPersonMissingFields(parent, "incompleteParentFLName,");
+        EligibilityUtils.debug("Parent is missing first name or last name.");
+end
+
+rule "ParentMissingDOBSSN"
+	ruleflow-group "personMissingInfo"
+	salience 100
+	no-loop true
+	
+	when
+	    parent: com.psi.vida.business.to.PersonTO(! isChild(), (isBlank(ssn) || isBlank(dateOfBirth)))
+        eval (incompletePersonBasicInfor)
+	then
+		addPersonMissingFields(parent, "missingParentSSN,");
+        EligibilityUtils.debug("Parent is missing date of birth and SSN.");
+end
+
+/*
+elLiteMissing
+*/
+
+rule "ApplicantMissingBothFandLName"
+	ruleflow-group "elLiteMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    child: com.psi.vida.business.to.PersonTO(isChild(), isBlank(firstName), isBlank(lastName))
+	then
+        errorCode.setELLiteError(true);
+		addPersonMissingFields(child, "missingChildFLName,");
+        EligibilityUtils.debug("MISSING_ELLITE_INFO: Missing applicant's First Name and Last Name");
+end
+
+rule "ParentMissingBothFandLName"
+	ruleflow-group "elLiteMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    parent: com.psi.vida.business.to.PersonTO(! isChild(), isBlank(firstName), isBlank(lastName))
+	then
+        errorCode.setELLiteError(true);
+		addPersonMissingFields(parent, "missingParentFLName,");
+        EligibilityUtils.debug("MISSING_ELLITE_INFO: Missing parent's First Name and Last Name");
+end
+
+rule "ParentIncompleteFandLName"
+	ruleflow-group "elLiteMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    parent: com.psi.vida.business.to.PersonTO(! isChild())
+	    eval( (isBlank(parent.getFirstName()) && !isBlank(parent.getLastName())) ||
+	    		(! isBlank(parent.getFirstName()) && isBlank(parent.getLastName())) )
+	then
+        errorCode.setELLiteError(true);
+		addPersonMissingFields(parent, "incompleteParentFLName,");
+        EligibilityUtils.debug("MISSING_EL_LITE_INFO: Incomplete parent First Name and Last Name.");
+end
+
+rule "AccountAddressInfo"
+	ruleflow-group "elLiteMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    homeAddress: AccountAddressTO(AddressTypeEnum.HOMEADDRESS.getValue().equals(addressType))
+	    eval( isBlank(homeAddress.getCity()) || isBlank(homeAddress.getState()) ||
+	    		isBlank(homeAddress.getStreet()) || isBlank(homeAddress.getPostalCode()) )
+	then
+        errorCode.setELLiteError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "missingAccountAddress,");
+        EligibilityUtils.debug("MISSING_EL_LITE_INFO: Missing one of the following account address: City, State, Street and ZipCode");
+end
+
+rule "AccountNoHomeAddress"
+	ruleflow-group "elLiteMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    not AccountAddressTO(AddressTypeEnum.HOMEADDRESS.getValue().equals(addressType))
+	    
+	then
+        errorCode.setELLiteError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "missingAccountAddress,");
+        EligibilityUtils.debug("MISSING_ELLITE_INFO:: Missing account home address");
+end
+
+/*
+eligibilityMissing
+*/
+
+rule "PersonMissingTaxFilerType"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+		person : PersonTO(taxFilerFlag == null || (taxFilerFlag && isBlank(taxFilingType)) )
+	  
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(person, "MISSING_TAX_FILER_INFO,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: MISSING_TAX_FILER_INFO");
+end
+
+rule "PersonNoTaxRelationship"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+		person : PersonTO(taxDependentFlag != null, taxDependentFlag )
+		eval(person.getTaxRelationships().size() == 0)
+	  
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(person, "MISSING_TAX_FILER_INFO,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: MISSING_TAX_FILER_INFO");
+end
+
+rule "PersonTaxDependentDetails"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+		person : PersonTO(taxDependentFlag != null, taxDependentFlag )
+		taxRelationship: TaxRelationshipTO(isBlank(relationshipType)) from person.getTaxRelationships();
+	  
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(person, "MISSING_TAX_FILER_INFO,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: MISSING_TAX_FILER_INFO");
+end
+
+rule "DeductionIncomplete"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+		person : PersonTO()
+	    expense : ExpenseTO(! ExpenseEnum.DAYCARE.getValue().equals(expenseType) && 
+	        ! ExpenseEnum.CHILDSUPPORT.getValue().equals(expenseType)) from person.getExpenses()
+	  	eval(isBlank(expense.getDeclaredFrequency()) || isBlank(expense.getExpenseType()) ||
+	  				isBlank(expense.getDeclaredAmount()))  
+	  
+	then
+        errorCode.setEligibilityError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "MISSING_DEDUCTION_INFO,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Deduction missing amount, frequency or type");
+end
+
+rule "DeductionNoOwner"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    exists ExpenseTO(expenseType == null || (! ExpenseEnum.DAYCARE.getValue().equals(expenseType) && 
+	        ! ExpenseEnum.CHILDSUPPORT.getValue().equals(expenseType))) from missingInfoOutput.getAccount().getAccountExpenses()
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "MISSING_DEDUCTION_INFO,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Missing owner of deduction.");
+end
+
+rule "IncomeIncomplete"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+		person : PersonTO()
+	    IncomeTO((declaredAmount == null && verfiedmonthlyAmount == null) || incomeSubtype == null) from person.getIncomes()
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(person, "incomeAmountReceiverUnverified,");
+        EligibilityUtils.debug("MISSING_ELIBGIBILITY_INFO: Person Has Incomplete Incomes: Missing Income type, declared amount, verified amount or frequency.");
+end
+
+rule "IncomeNoOwner"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    exists IncomeTO() from missingInfoOutput.getAccount().getAccountIncomes()
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "incomeAmountReceiverUnverified,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Missing income receiver on account income.");
+end
+
+rule "ChildUnknownInsuranceCancelled"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant : PersonTO(isChild(), 
+	    	! MemberStatusEnum.SUSPENDED.getValue().equals(status), memberLostInsuranceFlag == null)
+    
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(applicant, "unknownInsuranceCancelledTime,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Unknow whether the applicant child has cancelled the insurance whithin the past 2 months.");
+end
+
+
+rule "ChildUnknownHasOtherInsurance"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant : PersonTO(isChild(), 
+	    	! MemberStatusEnum.SUSPENDED.getValue().equals(status), hasInsuranceFlag == null)
+
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(applicant, "unknowHasOtherInsurance,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Whether the applicant has other insurance is unknown.");
+end
+
+rule "StateOfResidenceMissing"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    AccountAddressTO(AddressTypeEnum.HOMEADDRESS.getValue().equals(addressType), state == null)
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "unknowChildstateofResidence,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Applicant child's state of residence is unknown.");
+end
+
+rule "ChildFamilyRelationshipMissing"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant : PersonTO(isChild())
+	    parent : PersonTO(! isChild())
+	    not FamilyRelationshipTO(toPersonTO == parent) from applicant.getRelationships()
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(applicant, "unknowRelationshipofChildtoHousehold,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Missing family relationship to parent " + parent.getFirstName());
+end
+
+rule "PersonLiveInHouseholdMissing"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    person : PersonTO(livesInPrimaryHousehold == null)
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(person, "MISSING_PERSON_LIVE_AT_SAME_HOUSE,");
+        EligibilityUtils.debug("MISSING_ELLIGIBILITY_INFO: Missing person lives in the same household flag");
+end
+
+rule "ApplicantDateOfBirthMissing"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant : PersonTO(isChild(), dateOfBirth == null)
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addPersonMissingFields(applicant, "missingChildDOB,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Missing applicant DOB");
+end
+
+rule "AddressCountyMissing"
+	ruleflow-group "eligibilityMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    AccountAddressTO(AddressTypeEnum.HOMEADDRESS.getValue().equals(addressType), county == null)
+	    
+	then
+        errorCode.setEligibilityError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "unknowCountryofResidence,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: Missing county info in the address.");
+end
+
+
+/*
+previewOnly
+regular
+miscMissing
+summary
+
+         house_hold: com.psi.vida.business.to.PersonTO(?this.isChild().booleanValue());
+         evaluate (house_hold.citizenshipNotVerified().booleanValue());
+      } then {
+         house_hold.addMissingField("citizenshipNotVerified,");
+         update house_hold;
+         com.psi.vida.util.EligibilityUtils.log("MISSING_MISC_INFO: citizenship verification");
+         MiscError = "TRUE";
+*/
+
+
+
+rule "PreviewHasUnverifiedCitizenship"
+	ruleflow-group "previewOnly"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant : PersonTO(isChild())
+	    eval(citizenshipNotVerified(applicant))
+	    
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(applicant, "citizenshipNotVerified,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: citizenship verification");
+end
+
+rule "PreviewHasUnverifiedIncome"
+	ruleflow-group "previewOnly"
+	salience 100
+	no-loop true
+	
+	when
+	    person : PersonTO()
+	    income : IncomeTO(isBlank(verficationStatus)) from person.getIncomes()
+	    
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(person, "incomeAmountReceiverUnverified,");
+        EligibilityUtils.debug("MISSING_ELIGIBILITY_INFO: house hold has Unverfied income");
+end
+
+
+/*
+regular
+ */
+ 
+
+ 
+ rule "ChildCitizenshipUnknown"
+	ruleflow-group "regular"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant : PersonTO(isChild(), isBlank(usCitizenshipStatus))
+	    
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(applicant, "missingChildCitizenship,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Missing child's citizenship.");
+end
+
+ rule "ChildUnknownDeclaredCitizenship"
+	ruleflow-group "regular"
+	salience 100
+	no-loop true
+	
+	when
+	    applicant : PersonTO(isChild(), declaredUsCitizenFlag == null)
+	    
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(applicant, "missingChildCitizenship,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Missing child's declared citizenship flag.");
+end
+
+/*
+miscMissing
+*/
+
+rule "ParentNeedCoverage"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    person : PersonTO(! MemberStatusEnum.SUSPENDED.getValue().equals(status))
+	    eval(isBlank(person.getApplyingForBenefitsFlag()))
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(person, "MISSING_NEED_HEALTH_COVERAGE,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: MISSING_NEED_HEALTH_COVERAGE.");
+end
+
+rule "ParentSSNMissing"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    parent : PersonTO(! isChild())
+	    eval(isBlank(parent.getSsn()))
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(parent, "missingParentSSN,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Missing parent's SSN");
+end
+
+rule "ChildSSNMissing"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    child : PersonTO(isChild(), ! MemberStatusEnum.SUSPENDED.getValue().equals(status))
+	    eval(isBlank(child.getSsn()))
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(child, "MISSING_CHILD_SSN,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Unknow child's SSN.");
+end
+
+rule "ChildGenderMissing"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    child : PersonTO(isChild(), ! MemberStatusEnum.SUSPENDED.getValue().equals(status))
+	    eval(isBlank(child.getGender()))
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(child, "missingChildSex,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Unknow child's sex. MiscError is " + errorCode.getMiscError());
+end
+
+rule "ChildTribalVerificationMissing"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    child : PersonTO(isChild(), ! MemberStatusEnum.SUSPENDED.getValue().equals(status), 
+	    	PrimaryRaceEnum.AMERICANINDIANORALASKANATIVE.getValue().equals(race))
+	    eval(child.getTribalMemberVerifiedFlag() == null || !child.getTribalMemberVerifiedFlag())
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(child, "missingTribalVerification,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Missing verification of Tribal Membership.");
+end
+
+rule "ChildCurrentInsuranceMissing"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    child : PersonTO(isChild(), (hasInsuranceFlag != null && hasInsuranceFlag) )
+	    not InsuranceTO() from child.getInsurances()
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(child, "unknowHasOtherInsurance,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Missing insurance coverage type");
+end
+
+
+rule "ChildCurrentInsuranceTypeMissing"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    child : PersonTO(isChild(), (hasInsuranceFlag != null && hasInsuranceFlag) )
+	    insurance : InsuranceTO() from child.getInsurances()
+		eval(isBlank(insurance.getCarrierName()))
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(child, "unknowHasOtherInsurance,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Missing insurance coverage type");
+end
+
+rule "ChildInsuranceCancelReasonMissing"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    child : PersonTO(isChild(), (memberLostInsuranceFlag != null && memberLostInsuranceFlag) )
+		eval(isBlank(child.getMemberLostInsuranceReason()))
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(child, "unknownInsuranceCancelledTime,");
+        EligibilityUtils.debug("Misc MissingInfor Error: Unknow the reason why the applicant child has cancelled the insurance whithin the past 2 months.");
+end
+
+rule "AccountNoIncome"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    not IncomeTO()
+	    
+	then
+        errorCode.setMiscError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "noIncomeReported,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: No income is reported");
+end
+
+rule "MissingEmergencyPhone"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    parentOne : PersonTO(isParentOne(this))
+		not PartyContactInfoTO(ContactInfoTypeEnum.EMERGENCYPHONE.getValue().equals(contactType)) from parentOne.getPartyContacts()    
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(parentOne, "missingEmergencyPhoneNumber,");
+        EligibilityUtils.debug("MISSING_MISC_INFO:Missing Parent one's Emergency Phone Number .");
+end
+
+rule "MissingHomePhone"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    parentOne : PersonTO(isParentOne(this))
+		not PartyContactInfoTO(ContactInfoTypeEnum.HOMEPHONE.getValue().equals(contactType)) from parentOne.getPartyContacts()    
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(parentOne, "missingHomePhoneNumber,");
+        EligibilityUtils.debug("MISSING_MISC_INFO:Missing Parent one's Home Phone Number .");
+end
+
+rule "MissingWorkPhone"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    parentOne : PersonTO(isParentOne(this))
+		not PartyContactInfoTO(ContactInfoTypeEnum.WORKPHONE.getValue().equals(contactType)) from parentOne.getPartyContacts()    
+	then
+        errorCode.setMiscError(true);
+        addPersonMissingFields(parentOne, "missingHomeWorkNumber,");
+        EligibilityUtils.debug("MISSING_MISC_INFO:Missing Parent one's Work Phone Number .");
+end
+
+rule "IncomepleteMailingAddress"
+	ruleflow-group "miscMissing"
+	salience 100
+	no-loop true
+	
+	when
+	    mailingAddress: AccountAddressTO(AddressTypeEnum.MAILINGADDRESS.getValue().equals(addressType))
+	    eval(isBlank(mailingAddress.getStreet()) || isBlank(mailingAddress.getCounty()) ||
+	    isBlank(mailingAddress.getState()) || isBlank(mailingAddress.getPostalCode()) || isBlank(mailingAddress.getCity()) )
+	    
+	then
+        errorCode.setMiscError(true);
+        addAccountMissingFields(missingInfoOutput.getAccount(), "incompleteMailingAddress,");
+        EligibilityUtils.debug("MISSING_MISC_INFO: Mailing address not complete.");
+end
+
+
+/*
+summary
+*/
+
+
+rule "MissingInformationErrorCode"
+	ruleflow-group "summary"
+	salience 10
+	no-loop true
+	    
+	then
+        missingInfoOutput.setErrorCode(errorCode.getMissingInfoStatus().name());
+        EligibilityUtils.debug("MissingInformation checking result: " + errorCode.getMissingInfoStatus().name());
+end
+
+/*
+rule "MiscError"
+	ruleflow-group "summary"
+	salience 10
+	no-loop true
+	
+	when
+	    eval(errorCode.getAccountError() == false && errorCode.getELLiteError() == false
+	    && errorCode.getEligibilityError() == false && errorCode.getMiscError())	    
+	then
+        missingInfoOutput.setErrorCode(MissingInfoEnum.MISSING_MISC_INFO.name());
+        EligibilityUtils.debug("MissingInformation checking result: MISSING_MISC_INFO");
+end
+
+rule "EligibilityError"
+	ruleflow-group "summary"
+	salience 10
+	no-loop true
+	
+	when
+	    eval(! errorCode.getAccountError() && ! errorCode.getELLiteError() 
+	    && errorCode.getEligibilityError())	    
+	then
+        missingInfoOutput.setErrorCode(MissingInfoEnum.MISSING_ELIGIBILITY_INFO.name());
+        EligibilityUtils.debug("MissingInformation checking result: MISSING_ELIBGIBILITY_INFO");
+end
+
+rule "ELLiteError"
+	ruleflow-group "summary"
+	salience 10
+	no-loop true
+	
+	when
+	    eval(! errorCode.getAccountError() && errorCode.getELLiteError())
+	    
+	then
+        missingInfoOutput.setErrorCode(MissingInfoEnum.MISSING_EL_LITE_INFO.name());
+        EligibilityUtils.debug("MissingInformation checking result: MISSING_ELLITE_INFO.");
+end
+
+rule "AccountError"
+	ruleflow-group "summary"
+	salience 10
+	no-loop true
+	
+	when
+	    eval(errorCode.getAccountError())
+	    
+	then
+        missingInfoOutput.setErrorCode(MissingInfoEnum.MISSING_ACCOUNT_INFO.name());
+        EligibilityUtils.debug("MissingInformation checking result: MISSING_ACCOUNT_INFO");
+end
+
+rule "PrintOut"
+	ruleflow-group "summary"
+	salience 1
+	no-loop true
+	
+	when
+		eval(true)
+	    
+	then
+        EligibilityUtils.debug("AccountError " + errorCode.getAccountError() + 
+        " ELLiteError " + errorCode.getELLiteError() + 
+        " EligibilityError " + errorCode.getEligibilityError() +
+        " MiscError " + errorCode.getMiscError());
+end
+*/        

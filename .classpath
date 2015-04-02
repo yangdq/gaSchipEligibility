@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src/main/java"/>
+	<classpathentry kind="src" path="src/test/resources"/>
+	<classpathentry kind="src" path="src/test/java"/>
+	<classpathentry kind="src" path="src/main/resources"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="DROOLS/Drools"/>
+	<classpathentry kind="lib" path="D:/Tools/drools-distribution-6.1.0.Final/binaries/jbpm-bpmn2-6.1.0.Final.jar"/>
+	<classpathentry kind="lib" path="D:/Tools/drools-distribution-6.1.0.Final/binaries/jbpm-flow-builder-6.1.0.Final.jar"/>
+	<classpathentry kind="lib" path="D:/Tools/drools-distribution-6.1.0.Final/binaries/jbpm-workitems-6.1.0.Final.jar"/>
+	<classpathentry kind="lib" path="D:/Tools/drools-distribution-6.1.0.Final/binaries/jbpm-flow-6.1.0.Final.jar"/>
+	<classpathentry kind="lib" path="lib/coreVidaRulesXOM.jar"/>
+	<classpathentry kind="lib" path="lib/cycleRecoverable-4.2.1_1.jar"/>
+	<classpathentry kind="lib" path="lib/jaxb-interoperability-1.0.0.jar"/>
+	<classpathentry kind="lib" path="lib/coreCommon-4.2.1_1.jar"/>
+	<classpathentry kind="lib" path="lib/commons-lang.jar"/>
+	<classpathentry kind="lib" path="lib/junit-4.10.0.jar"/>
+	<classpathentry kind="lib" path="lib/coreEligibilityManagementClient.jar"/>
+	<classpathentry kind="lib" path="lib/log4j-1.2.15.jar"/>
+	<classpathentry kind="lib" path="lib/coreAccountManagementClient.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

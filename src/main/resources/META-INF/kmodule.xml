@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kmodule xmlns="http://jboss.org/kie/6.0.0/kmodule">
+    <kbase name="eligibilityscreen" packages="com.maximus.drools.eligibilityscreen">
+        <ksession name="eligibilityScreen"/>
+    </kbase>
+    <kbase name="missinginformation" packages="com.maximus.drools.missinginformation">
+        <ksession name="missingInformation" default = "true"/>
+    </kbase>
+    <kbase name="financialeligibility" packages="com.maximus.drools.financialeligibility">
+        <ksession name="financialEligibility"/>
+    </kbase>
+    <kbase name="premiumcalculation" packages="com.maximus.drools.premiumcalculation">
+        <ksession name="premiumCalculation"/>
+    </kbase>    
+    <kbase name="dtables" packages="dtables">
+        <ksession name="ksession-dtables"/>
+    </kbase>
+</kmodule>
