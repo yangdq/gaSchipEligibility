@@ -40,7 +40,7 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
 
     	EligibilityResultTO erto = new EligibilityResultTO();
     	erto.setSchipSelectionType("XXI");
-    	erto.setXxiIncome(1509.99d);
+    	erto.setXxiIncome(1389.99d);
     	erto.setXxiFamilyFpl(1000.00d);
     	erto.setAccountRelationshipId(RuleSetOOCTestDataUtil.c1Id);
     	PersonTO applicant = RuleSetOOCTestDataUtil.findPersonFromAccount(account, RuleSetOOCTestDataUtil.c1Id);
@@ -62,7 +62,7 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
 
     	EligibilityResultTO erto = new EligibilityResultTO();
     	erto.setSchipSelectionType("XXI");
-    	erto.setXxiIncome(1510.00d);
+    	erto.setXxiIncome(1589.99d);
     	erto.setXxiFamilyFpl(1000.00d);
     	erto.setAccountRelationshipId(RuleSetOOCTestDataUtil.c1Id);
     	PersonTO applicant = RuleSetOOCTestDataUtil.findPersonFromAccount(account, RuleSetOOCTestDataUtil.c1Id);
@@ -76,11 +76,34 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	input.setResults(ls);
     	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
     	
-    	verifyPremiumResult(resultsFromRuleEngine, 20.0d, "B");
+    	verifyPremiumResult(resultsFromRuleEngine, 11.0d, "B");
     }
     
     @Test
     public void testPremiumCalculation_planC() throws Exception{
+    	AccountTO account = RuleSetOOCTestDataUtil.createBasedAccount();
+
+    	EligibilityResultTO erto = new EligibilityResultTO();
+    	erto.setSchipSelectionType("XXI");
+    	erto.setXxiIncome(1709.99d);
+    	erto.setXxiFamilyFpl(1000.00d);
+    	erto.setAccountRelationshipId(RuleSetOOCTestDataUtil.c1Id);
+    	PersonTO applicant = RuleSetOOCTestDataUtil.findPersonFromAccount(account, RuleSetOOCTestDataUtil.c1Id);
+    	erto.setPerson(applicant);
+    	erto.setSchipStatus("ELIGIBLE");
+    	erto.setEligibilityResultId(1111L);
+    	PremiumCalInput input = new PremiumCalInput();
+    	ArrayList<EligibilityResultTO> ls = new ArrayList<EligibilityResultTO>();
+    	ls.add(erto);
+    	input.setAccount(account);
+    	input.setResults(ls);
+    	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
+    	
+    	verifyPremiumResult(resultsFromRuleEngine, 22.0d, "C");
+    }
+    
+    @Test
+    public void testPremiumCalculation_planD() throws Exception{
     	AccountTO account = RuleSetOOCTestDataUtil.createBasedAccount();
 
     	EligibilityResultTO erto = new EligibilityResultTO();
@@ -99,11 +122,11 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	input.setResults(ls);
     	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
     	
-    	verifyPremiumResult(resultsFromRuleEngine, 24.0d, "C");
-    }
+    	verifyPremiumResult(resultsFromRuleEngine, 24.0d, "D");
+    }    
     
     @Test
-    public void testPremiumCalculation_planD() throws Exception{
+    public void testPremiumCalculation_planE() throws Exception{
     	AccountTO account = RuleSetOOCTestDataUtil.createBasedAccount();
 
     	EligibilityResultTO erto = new EligibilityResultTO();
@@ -122,12 +145,12 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	input.setResults(ls);
     	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
     	
-    	verifyPremiumResult(resultsFromRuleEngine, 28.0d, "D");
+    	verifyPremiumResult(resultsFromRuleEngine, 29.0d, "E");
     }
 
     
     @Test
-    public void testPremiumCalculation_planE() throws Exception{
+    public void testPremiumCalculation_planF() throws Exception{
     	AccountTO account = RuleSetOOCTestDataUtil.createBasedAccount();
 
     	EligibilityResultTO erto = new EligibilityResultTO();
@@ -146,16 +169,16 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	input.setResults(ls);
     	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
     	
-    	verifyPremiumResult(resultsFromRuleEngine, 31.0d, "E");
+    	verifyPremiumResult(resultsFromRuleEngine, 32.0d, "F");
     }
     
     @Test
-    public void testPremiumCalculation_planF() throws Exception{
+    public void testPremiumCalculation_planG() throws Exception{
     	AccountTO account = RuleSetOOCTestDataUtil.createBasedAccount();
 
     	EligibilityResultTO erto = new EligibilityResultTO();
     	erto.setSchipSelectionType("XXI");
-    	erto.setXxiIncome(2310.00d);
+    	erto.setXxiIncome(2320.00d);
     	erto.setXxiFamilyFpl(1000.00d);
     	erto.setAccountRelationshipId(RuleSetOOCTestDataUtil.c1Id);
     	PersonTO applicant = RuleSetOOCTestDataUtil.findPersonFromAccount(account, RuleSetOOCTestDataUtil.c1Id);
@@ -169,7 +192,7 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	input.setResults(ls);
     	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
     	
-    	verifyPremiumResult(resultsFromRuleEngine, 35.0d, "F");
+    	verifyPremiumResult(resultsFromRuleEngine, 36.0d, "G");
     }
     
     @Test
@@ -179,7 +202,7 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	
     	EligibilityResultTO erto1 = new EligibilityResultTO();
     	erto1.setSchipSelectionType("XXI");
-    	erto1.setXxiIncome(2310.00d);
+    	erto1.setXxiIncome(2320.00d);
     	erto1.setXxiFamilyFpl(1000.00d);
     	erto1.setAccountRelationshipId(RuleSetOOCTestDataUtil.c1Id);
     	PersonTO applicant1 = RuleSetOOCTestDataUtil.findPersonFromAccount(account, RuleSetOOCTestDataUtil.c1Id);
@@ -190,7 +213,7 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
  
     	EligibilityResultTO erto2 = new EligibilityResultTO();
     	erto2.setSchipSelectionType("XXI");
-    	erto2.setXxiIncome(2310.00d);
+    	erto2.setXxiIncome(2320.00d);
     	erto2.setXxiFamilyFpl(1000.00d);
     	erto2.setAccountRelationshipId(RuleSetOOCTestDataUtil.c2Id);
     	PersonTO applicant2 = RuleSetOOCTestDataUtil.findPersonFromAccount(account, RuleSetOOCTestDataUtil.c2Id);
@@ -207,7 +230,7 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	input.setResults(ls);
     	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
     	
-    	verifyPremiumResult(resultsFromRuleEngine, 70.0d, "F");
+    	verifyPremiumResult(resultsFromRuleEngine, 72.0d, "G");
     }
     
     @Test
@@ -289,7 +312,7 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	
     	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
     	
-    	verifyPremiumResult(resultsFromRuleEngine, 48.0d, "C");
+    	verifyPremiumResult(resultsFromRuleEngine, 44.0d, "C");
     }
     
     @Test
@@ -319,7 +342,7 @@ public class PremiumCalculationTestOOC extends AwVidaRuleEngineBaseTestCase{
     	
     	PremiumCalOutput resultsFromRuleEngine = super.premiumCalculation(input);
     	
-    	verifyPremiumResult(resultsFromRuleEngine, 35.0d, "F");
+    	verifyPremiumResult(resultsFromRuleEngine, 32.0d, "F");
     }    
     
     
