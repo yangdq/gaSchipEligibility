@@ -29,6 +29,7 @@ import com.psi.vida.concept.ruleservice.util.RuleSetOOCTestDataUtil;
 import com.psi.vida.generatedenums.ListOfValuesUtil.EarnedIncomeSubtypeEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityStatusEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.ExpenseEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.IncomeTypeEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.UnearnedIncomeSubtypeEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.VerificationStatusEnum;
 import com.psi.vida.log.ILogger;
@@ -39,6 +40,8 @@ public class AwEligibilityTestOOC extends AwVidaRuleEngineBaseTestCase{
 	ILogger _logger = VidaLoggerFactory.getLogger(AwEligibilityTestOOC.class);
 	AccountTO account = null;
 	EligibilityInput input = new EligibilityInput();
+	
+	protected static final double comparisonDelta = 0.00001d;
 
     public AwEligibilityTestOOC() {
     }
@@ -48,54 +51,113 @@ public class AwEligibilityTestOOC extends AwVidaRuleEngineBaseTestCase{
     	account = RuleSetOOCTestDataUtil.createCompleteAccount();
     	input.setAccount(account);
     }
-
+    
     @Test
     public void testIncomeCalculation() throws Exception {
+    	PersonTO parent = account.getPersons().get(0);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 833.00d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);
     	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
     	Assert.assertEquals("One Result is Created", 1, results.size());
     	EligibilityResultTO result = results.get(0);
     	System.out.println(result.getXxiIncome());
-    	Assert.assertTrue(result.getXxiIncome().equals(934.0d));
+    	Assert.assertEquals(1833.00d, result.getXxiIncome().doubleValue(), comparisonDelta);
     	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
     	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
     }
     
     @Test
+    public void testIncomeMdcdDeduction() throws Exception {
+    	PersonTO parent = account.getPersons().get(0);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 832.99d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);    	
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	Assert.assertEquals(1765.99d, result.getXxiIncome(), comparisonDelta);
+    	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
+    }
+    
+    @Test
+    public void testIncomeMdcd_NoDeduction() throws Exception {
+    	PersonTO parent = account.getPersons().get(0);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 833.10d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);    	
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	Assert.assertEquals(1833.10d, result.getXxiIncome(), comparisonDelta);
+    	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
+    }    
+    
+    @Test
+    public void testIncomeSchipDeduction() throws Exception {
+    	PersonTO parent = account.getPersons().get(0);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 2346.00d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);    	
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	Assert.assertEquals(3279.00d, result.getXxiIncome(), comparisonDelta);
+    	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
+    }
+    
+    @Test
+    public void testIncomeSchip_NoDeduction() throws Exception {
+    	PersonTO parent = account.getPersons().get(0);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 2346.01d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);    	
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	Assert.assertEquals(3346.01d, result.getXxiIncome(), comparisonDelta);
+    	Assert.assertEquals(EligibilityStatusEnum.NOTELIGIBLE.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("One Status Reason is associated to the result", 1, result.getStatusReasons().size());
+    }    
+    
+    @Test
     public void testIncomeFiltering() throws Exception {
     	PersonTO parent = account.getPersons().get(0);
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 100.0d, 
-    			VerificationStatusEnum.VERIFIED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 100.0d, 
-    			VerificationStatusEnum.VERIFIED, EarnedIncomeSubtypeEnum.OTHEREARNEDINCOME);
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.OTHEREARNEDINCOME);
     	// Ignored
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 99.0d, 
-    			VerificationStatusEnum.VERIFIED, UnearnedIncomeSubtypeEnum.ANNUITYPAYMENTS);  
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.ANNUITYPAYMENTS);  
     	// Ignored
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 88.0d, 
-    			VerificationStatusEnum.VERIFIED, UnearnedIncomeSubtypeEnum.CHILDSUPPORTRECEIVED);
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.CHILDSUPPORTRECEIVED);
     	// Ignored
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 77.0d, 
-    			VerificationStatusEnum.VERIFIED, UnearnedIncomeSubtypeEnum.CONTRIBUTIONS); 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.CONTRIBUTIONS); 
     	// Ignored
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 66.0d, 
-    			VerificationStatusEnum.VERIFIED, UnearnedIncomeSubtypeEnum.DISABILITY);  
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.DISABILITY);  
     	// Ignored
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 55.0d, 
-    			VerificationStatusEnum.VERIFIED, UnearnedIncomeSubtypeEnum.LONGTERMDISABILITY); 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.LONGTERMDISABILITY); 
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 100.0d, 
-    			VerificationStatusEnum.VERIFIED, UnearnedIncomeSubtypeEnum.OTHERUNEARNEDINCOME); 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.OTHERUNEARNEDINCOME); 
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 100.0d, 
-    			VerificationStatusEnum.VERIFIED, UnearnedIncomeSubtypeEnum.PENSIONRETIREMENTBENEFITS); 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.PENSIONRETIREMENTBENEFITS); 
     	//Ignored
     	RuleSetOOCTestDataUtil.addIncomeToPerson(parent, 44.0d, 
-    			VerificationStatusEnum.VERIFIED, UnearnedIncomeSubtypeEnum.SUPPLEMENTALSECURITYINCOME);     	
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.SUPPLEMENTALSECURITYINCOME);     	
     	
     	
     	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
     	Assert.assertEquals("One Result is Created", 1, results.size());
     	EligibilityResultTO result = results.get(0);
     	System.out.println(result.getXxiIncome());
-    	Assert.assertTrue(result.getXxiIncome().equals(1334.0d));
+    	Assert.assertEquals(1400.0d, result.getXxiIncome(), comparisonDelta);
     	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
     	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
     }
@@ -115,38 +177,86 @@ public class AwEligibilityTestOOC extends AwVidaRuleEngineBaseTestCase{
     	Assert.assertEquals("One Result is Created", 1, results.size());
     	EligibilityResultTO result = results.get(0);
     	System.out.println(result.getXxiIncome());
-    	Assert.assertTrue(result.getXxiIncome().equals(637.0d));
+    	Assert.assertEquals(703.0d, result.getXxiIncome(), comparisonDelta);
     	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
     	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
     }
     
-
-    
-
-    
-    /**
-     * Get first status reason when there are more than one reason.
-     * @param reasons multiple status reasons
-     * @return
-     */
-    private String getStatusReason(Set<EligibilityStatusReasonTO> reasons) {
-        java.util.Iterator it= reasons.iterator();
-        if(it.hasNext()){
-        	EligibilityStatusReasonTO reasonTO = (EligibilityStatusReasonTO) it.next();
-        	return reasonTO.getStatusReason();
-        }
-        return new String();
+    @Test
+    public void testDependentIncomeFiltering_exclude() throws Exception {
+    	PersonTO child = account.getPersons().get(1);
+    	
+    	// Ignored since earned income annual amt < 6200 and unearned income annual amt < 1000
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(child, 100.0d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(child, 80.0d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.SOCIALSECURITY);  
+    	 	
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	Assert.assertEquals(1000.0d, result.getXxiIncome(), comparisonDelta);
+    	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
     }
     
-    public void genericTest(){
-    	List<Integer> numbs = new ArrayList<Integer>(10);
+    @Test
+    public void testDependentIncomeFiltering_Include() throws Exception {
+    	PersonTO child = account.getPersons().get(1);
     	
-    	numbs.add(new Integer(10));
-    	numbs.add(2);
-    	process(numbs);
+    	// Included.  Although earned income annual amt < 6200, unearned income annual amt > 1000
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(child, 100.0d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(child, 90.0d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.SOCIALSECURITY);  
+    	 	
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	Assert.assertEquals(1190.0d, result.getXxiIncome(), comparisonDelta);
+    	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
     }
     
-    public  void process(List<? extends Number> list){
+    @Test
+    public void testDependentIncomeFiltering_excludeRSDI() throws Exception {
+    	PersonTO child = account.getPersons().get(1);
     	
+    	// Excluded.  Earned income annual amt < 6200, unearned income annual amt > 1000 but it is RSDI so ignore it
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(child, 100.0d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(child, 1000.0d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.RSDI);  
+    	 	
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	Assert.assertEquals(1000.0d, result.getXxiIncome(), comparisonDelta);
+    	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
+    }
+    
+    
+    @Test
+    public void testDependentIncomeFiltering_includeRSDI() throws Exception {
+    	PersonTO child = account.getPersons().get(1);
+    	
+    	// Included.  Earned income annual amt > 6200, unearned is RSDI so ignore it in threshold calculation
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(child, 520.0d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.EARNED, EarnedIncomeSubtypeEnum.SELFEMPLOYMENT);
+    	RuleSetOOCTestDataUtil.addIncomeToPerson(child, 80.0d, 
+    			VerificationStatusEnum.VERIFIED, IncomeTypeEnum.UNEARNED, UnearnedIncomeSubtypeEnum.RSDI);  
+    	 	
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	// RSDI amount is included in the final calculation, even if RSDI amt is excluded in the threshold calculation
+    	Assert.assertEquals(1600.0d, result.getXxiIncome(), comparisonDelta);
+    	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
     }
 }

@@ -198,7 +198,7 @@ public class RuleSetOOCTestDataUtil {
 		return account;
 	}
 	
-	public static void addIncomeToPerson(PersonTO person, double incomeAmt, VerificationStatusEnum ver, LOV subType){
+	public static void addIncomeToPerson(PersonTO person, double incomeAmt, VerificationStatusEnum ver, LOV incomeType, LOV incomeSubType){
 		IncomeTO income = new IncomeTO();
 		income.setDeclaredAmount(new BigDecimal(incomeAmt));
 		income.setComputedMonthlyAmount(new BigDecimal(incomeAmt));
@@ -207,8 +207,8 @@ public class RuleSetOOCTestDataUtil {
 			income.setVerficationStatus(VerificationStatusEnum.VERIFIED.getValue());
 		}
 		income.setDeclaredFrequency(FrequencyEnum.MONTHLY.getValue());
-		income.setIncomeType(IncomeTypeEnum.EARNED.getValue());
-		income.setIncomeSubtype(subType.getValue());
+		income.setIncomeType(incomeType.getValue());
+		income.setIncomeSubtype(incomeSubType.getValue());
 		person.getIncomes().add(income);
 	}
 	
