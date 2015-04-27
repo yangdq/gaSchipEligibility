@@ -13,11 +13,11 @@
 	<classpathentry kind="lib" path="lib/coreVidaRulesXOM.jar"/>
 	<classpathentry kind="lib" path="lib/cycleRecoverable-4.2.1_1.jar"/>
 	<classpathentry kind="lib" path="lib/jaxb-interoperability-1.0.0.jar"/>
-	<classpathentry kind="lib" path="lib/coreCommon-4.2.1_1.jar"/>
 	<classpathentry kind="lib" path="lib/commons-lang.jar"/>
 	<classpathentry kind="lib" path="lib/junit-4.10.0.jar"/>
 	<classpathentry kind="lib" path="lib/coreEligibilityManagementClient.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.15.jar"/>
 	<classpathentry kind="lib" path="lib/coreAccountManagementClient.jar"/>
+	<classpathentry kind="lib" path="lib/coreCommon-4.7.0_2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
