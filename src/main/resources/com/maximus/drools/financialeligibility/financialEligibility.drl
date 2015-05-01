@@ -1,9 +1,11 @@
-//created on: Mar 27, 2015
+//created on: April 30, 2015
 package com.maximus.drools.financialeligibility
+
+dialect "mvel"
 
 //list any import classes here.
 import com.psi.vida.business.to.*;
-import com.psi.vida.business.vo.EligibilityOutput;
+import com.psi.vida.util.rules.MAGIHousehold;
 import com.psi.vida.business.eligibilitymanagement.processstatus.EligibilityPrescreenStatusEnum;
 import java.util.Iterator;
 import com.psi.vida.business.to.MemberStatusReasonTO
@@ -22,27 +24,192 @@ import com.psi.vida.util.rules.DateUtil;
 import java.util.ArrayList;
 import java.util.HashSet;
 import com.psi.vida.util.rules.FamilyUnit;
+import com.psi.vida.business.vo.EligibilityOutput;
+import com.psi.vida.business.vo.EligibilityInput;
+import com.maximus.rule.internal.DroolsInternal;
 
 
 //declare any global variables here
 
 global EligibilityOutput eligibilityOutput;
+global EligibilityInput eligibilityInput;
+global DroolsInternal internalData;
 
 
-rule "Your First Rule"
+function void addElgResultStatusReason(EligibilityResultTO result, String statusReason){
+	boolean isNotMatched = true;
+	EligibilityStatusReasonTO elstatusReasonTO = new EligibilityStatusReasonTO();
+	elstatusReasonTO.setEligibilityResultId(result.getEligibilityResultId());
+	elstatusReasonTO.setStatusReason(statusReason);
+	Iterator it = result.getStatusReasons().iterator();
+	while(it.hasNext()){
+		EligibilityStatusReasonTO esrto = (EligibilityStatusReasonTO)it.next();
+		if(statusReason.equals(esrto.getStatusReason())){
+			isNotMatched = false;
+			break;
+		}
+	}
 
-    when
-        //conditions
+	if(isNotMatched){
+		result.getStatusReasons().add(elstatusReasonTO);
+	}
+}
+
+function boolean personProvisionallyVerified(PersonTO applicant){
+	if(applicant.getProvisionalCitizenshipFlag() != null && applicant.getProvisionalCitizenshipFlag()){
+ 		return true;
+ 	}
+ 	else if (applicant.getProvisionalIdentityFlag() != null && applicant.getProvisionalIdentityFlag()){
+ 		return true;
+ 	}
+ 	return false;
+}
+
+
+function EligibilityResultTO createElgResult(PersonTO applicant){
+	EligibilityResultTO elgResult = new EligibilityResultTO();
+	java.util.Date determinD = new java.util.Date();
+	elgResult.setDateDetermined(determinD);
+	elgResult.setEffectiveDate(determinD);
+	elgResult.setStatus(SoftDeleteEnum.ACTIVE.getValue());
+	elgResult.setSource("VIDA");
+	elgResult.setSchipStatus(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue());
+	elgResult.setMdcdStatus(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue());
+	elgResult.setAccountRelationshipId(applicant.getAccountRelationshipId());
+	elgResult.setMemberStatus(applicant.getStatus());
+	elgResult.setPerson(applicant);
+	return elgResult;
+}
+
+function MAGIHousehold createMAGIHousehold(PersonTO applicant){
+	MAGIHousehold household = new MAGIHousehold(applicant);
+	household.getMembers().add(applicant);
+	return household;
+}
+
+rule "eligibilityInitialSetup"
+	ruleflow-group "eligibilityInitialSetup"
+	salience 100000
+
     then
-        //actions
+
+        DroolsInternal internalData = new DroolsInternal();
+        internalData.familyHasVerfieidIncome = false;
+end
+
+rule "insertPerson"
+	ruleflow-group "eligibilityInitialSetup"
+	salience 10000
+	no-loop true
+	
+    when
+        person: PersonTO(! MemberStatusEnum.DECEASED.toString().equals(status) 
+        		&& ! MemberStatusEnum.INACTIVE.toString().equals(status)) from eligibilityOutput.account.persons
+    then
+    	insert(person);
+        EligibilityUtils.debug("Insert into working memory person " + person.getFirstName() + " to " + DateUtil.currentAge(person.getDateOfBirth()));
 
 end
 
-rule "Your Second Rule"
-    //include attributes such as "salience" here...
+rule "insertHomeAddress"
+	ruleflow-group "eligibilityInitialSetup"
+	salience 10000
+	no-loop true
+	
     when
-        //conditions
+        address: AccountAddressTO(AddressTypeEnum.HOMEADDRESS.toString().equals(addressType)) from eligibilityOutput.account.accountAddresses
     then
-        //actions
+    	insert(address);
+        EligibilityUtils.debug("Insert into working memory home address ") ;
 
 end
+
+rule "insertFamilyRelationships"
+	ruleflow-group "eligibilityInitialSetup"
+	salience 5000
+	no-loop true
+	
+    when
+    	person: PersonTO()
+        familyRealtion : FamilyRelationshipTO() from person.relationships
+    then
+    	insert(familyRealtion);
+        EligibilityUtils.debug("Insert into WM family relationships for person " + person.firstName) ;
+
+end
+
+rule "insertTaxRealtionships"
+	ruleflow-group "eligibilityInitialSetup"
+	salience 5000
+	no-loop true
+	
+    when
+    	person: PersonTO()
+        taxRealtion : TaxRelationshipTO() from person.taxRelationships
+    then
+    	insert(taxRealtion);
+        EligibilityUtils.debug("Insert into WM tax relationships for person " + person.firstName) ;
+end
+
+rule "insertApplicantHouseholdResult"
+	ruleflow-group "eligibilityInitialSetup"
+	salience 5000
+	no-loop true
+	
+    when
+    	applicant: PersonTO(isChild(), dateOfBirth != null, applyingForBenefitsFlag == null || applyingForBenefitsFlag)
+    then
+    	EligibilityResultTO result = createElgResult(applicant);
+    	eligibilityOutput.results.add(result);
+    	insert(result);
+    	insert(createMAGIHousehold(applicant));
+        EligibilityUtils.debug("Insert into WM eligibility result and MAGI household for person " + applicant.firstName) ;
+end
+
+
+
+rule "calculateApplicantAge"
+	ruleflow-group "eligibilityInitialSetup"
+	salience 100
+	no-loop true
+	
+    when
+        applicant: com.psi.vida.business.to.PersonTO(isChild(), dateOfBirth != null)
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), age == null)
+    then
+    	modify(eligibility_result){
+   			setAge(java.lang.Long.valueOf((long)(com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth)))); 		
+    	}
+        EligibilityUtils.debug("Calculate applicant age for Eligibility Result of Applicant " + applicant.firstName + " to " + com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth));
+
+end
+
+   rule "scanForVerifiedIncome"
+	ruleflow-group "eligibilityInitialSetup"
+	salience 100
+	no-loop true
+	
+      when 
+         person: PersonTO();
+         exists IncomeTO("VERIFIED".equals(verficationStatus), !("SUPPLEMENTAL_SECURITY_INCOME".equals(incomeSubtype)) )  from person.incomes;
+
+       then 
+         internalData.familyHasVerfieidIncome = true;
+         EligibilityUtils.debug("Family has verified incomes.  Eligibility preview should use verified incomes only");
+      
+end
+
+/*taxFilerException
+magiHouseholdType
+magiHouseholdSetup
+magiCalculation
+initializeResults
+financialMdcd
+chipDetermination
+processChipResults
+nonFinancialMdcd
+
+
+*/
+
+

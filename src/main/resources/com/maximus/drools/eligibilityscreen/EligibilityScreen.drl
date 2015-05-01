@@ -1,6 +1,8 @@
 //created on: Sep 22, 2014
 package com.maximus.drools.eligibilityscreen;
 
+dialect "mvel"
+
 import com.psi.vida.business.to.*;
 import com.psi.vida.business.vo.EligibilityOutput;
 import com.psi.vida.business.eligibilitymanagement.processstatus.EligibilityPrescreenStatusEnum;
@@ -359,8 +361,8 @@ rule "DenyOutOfState"
 	    applicant: com.psi.vida.business.to.PersonTO(isChild(), getApplyingForBenefitsFlag() == null || getApplyingForBenefitsFlag())
         eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
         address: AccountAddressTO(state != null)
-        eval (! address.getState().equals("GA")
-         	&& ! applicant.getStatus().equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
+        eval (! address.state.equals("GA")
+         	&& ! applicant.status.equals(MemberStatusEnum.PENDINGVERIFICATION.getValue()))
 	then
     	eligibility_result.setSchipStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
     	eligibility_result.setMdcdStatus(EligibilityStatusEnum.NOTELIGIBLE.getValue());
@@ -458,7 +460,7 @@ rule "CollectDenialResults"
 	    result: EligibilityResultTO(EligibilityStatusEnum.NOTELIGIBLE.getValue().equals(schipStatus))
         
 	then
-		elgScreenOutput.getResults().add(result);
+		elgScreenOutput.results.add(result);
         EligibilityUtils.debug("Add NOT_ELIGIBLE result for elgScreenOutput ");
 
 end

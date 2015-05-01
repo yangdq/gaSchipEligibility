@@ -45,7 +45,8 @@ public class DroolsRuleServiceImpl implements RuleServiceBusiness {
 	private static final String RULEFLOW_MISSINGINFO = "missingInformation";
 	private static final String RULEFLOW_PREMIUMCALCULATION = "premiumCalculation";	
 	private static final String PRESCREEN_OUTPUT = "elgScreenOutput";
-	private static final String FINANCIAL_OUTPUT = "financialOutput";
+	private static final String FINANCIAL_OUTPUT = "eligibilityOutput";
+	private static final String FINANCIAL_INPUT = "eligibilityInput";
 	private static final String MISSINGINFO_OUTPUT = "missingInfoOutput";
 	private static final String MISSINGINFO_ERRORCODE = "errorCode";
 	private static final String PREMIUM_OUTPUT = "premiumOutput";
@@ -100,6 +101,7 @@ public class DroolsRuleServiceImpl implements RuleServiceBusiness {
     	
         output.setAccount(input.getAccount());
         output.setResults(elgResults);
+        ruleSession.setGlobal(FINANCIAL_INPUT, input);
         ruleSession.setGlobal(FINANCIAL_OUTPUT, output);
         
         Map<String, Object> jbpmParams = new HashMap<String, Object>();

@@ -7,6 +7,7 @@ public class DroolsInternal {
 	private Double premiumAmount = 0.0d;
 	private int lowestFPLPct = 2000;
 	private Date currentMonth = new Date();
+	private Boolean familyHasVerfieidIncome = false;
 
 	public Integer getRetroCount() {
 		return retroCount;
@@ -38,7 +39,14 @@ public class DroolsInternal {
 
 	public void setCurrentMonth(Date currentMonth) {
 		this.currentMonth = currentMonth;
+	}
+
+	public Boolean getFamilyHasVerfieidIncome() {
+		return familyHasVerfieidIncome;
+	}
+
+	public void setFamilyHasVerfieidIncome(Boolean familyHasVerfieidIncome) {
+		this.familyHasVerfieidIncome = familyHasVerfieidIncome;
 	}	
-	
 	
 }
