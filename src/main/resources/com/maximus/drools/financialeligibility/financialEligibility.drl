@@ -1129,13 +1129,30 @@ rule "ChipEligibilityDetermination"
          applicant: PersonTO(isChild(), status.equals("MEMBER_VERIFIED"));
          eligibility_result: EligibilityResultTO(person == applicant, statusReasons.isEmpty());
          account: AccountTO(accountStatus.equals("COMPLIANT")) from eligibilityInput.account;
-         eval (!(account.sentG04i));
+         eval (!(account.sentG04i) && ! eligibilityInput.preview);
        then 
          eligibility_result.schipStatus = "ELIGIBLE";
          update(eligibility_result);         
-         EligibilityUtils.debug("Sset SCHIP Eligibility Status to 'ELIGIBLE' for Applicant " + applicant.firstName);
+         EligibilityUtils.debug("Set SCHIP Eligibility Status to 'ELIGIBLE' for Applicant " + applicant.firstName);
 
 end
+
+rule "ChipEligibilityPreview"
+	ruleflow-group "processChipResults"
+	salience 3000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant, statusReasons.isEmpty());
+         eval (eligibilityInput.preview);
+       then 
+         eligibility_result.schipStatus = "ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("SCHIP Eligibility Preview Status to 'ELIGIBLE' for Applicant " + applicant.firstName);
+
+end
+
 
 rule "ChipPendingInsuranceReferral"
 	ruleflow-group "processChipResults"
@@ -1145,7 +1162,7 @@ rule "ChipPendingInsuranceReferral"
       when 
          applicant: PersonTO(isChild(), isNullSafeTrue(memberLostInsuranceFlag));
          eligibility_result: EligibilityResultTO(person == applicant, schipStatus.equals("PENDING_ELIGIBILITY"));
-         eval (insuranceReferralNotApprovedYet(applicant));
+         eval (insuranceReferralNotApprovedYet(applicant) && ! eligibilityInput.preview);
        then 
          addElgResultStatusReason(eligibility_result, "OUTSTANDING_INSURANCE_REFERRAL");
          update(eligibility_result);         
@@ -1162,8 +1179,8 @@ rule "FianncialMdcdHoldSchip"
       when 
          applicant: PersonTO(isChild());
          eligibility_result: EligibilityResultTO(person == applicant);
-         eval ((("PENDING_ELIGIBILITY".equals(eligibility_result.mdcdStatus))
-         	&& ("ELIGIBLE".equals(eligibility_result.schipStatus))));
+         eval ("PENDING_ELIGIBILITY".equals(eligibility_result.mdcdStatus)
+         	&& ! ("NOT_ELIGIBLE".equals(eligibility_result.schipStatus)));
        then 
          eligibility_result.schipStatus = "PENDING_ELIGIBILITY";
          update (eligibility_result);       
@@ -1317,7 +1334,7 @@ rule "DenyNotVerifiedMember"
          EligibilityUtils.debug("Deny mdcd for member is not verified yet to Eligibility Result of Applicant " + applicant.firstName);
 end
 
-rule "EligibleForMdcdReferral"
+rule "PendingForMdcdReferral"
 	ruleflow-group "nonFinancialMdcd"
 	salience 100
 	no-loop true
