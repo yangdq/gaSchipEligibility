@@ -18,6 +18,6 @@
 	<classpathentry kind="lib" path="lib/coreEligibilityManagementClient.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.15.jar"/>
 	<classpathentry kind="lib" path="lib/coreAccountManagementClient.jar"/>
-	<classpathentry kind="lib" path="lib/coreCommon-4.7.0_2.jar"/>
+	<classpathentry kind="lib" path="lib/coreCommon-4.7.0_4.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

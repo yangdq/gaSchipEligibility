@@ -40,7 +40,7 @@
     </exclusiveGateway>
     <exclusiveGateway id="_jbpm-unique-7" name="Gateway" gatewayDirection="Converging" >
     </exclusiveGateway>
-    <businessRuleTask id="_jbpm-unique-1" name="Initial Setup" g:ruleFlowGroup="initialSetup" >
+    <businessRuleTask id="_jbpm-unique-1" name="Initial Setup" g:ruleFlowGroup="eligibilityInitialSetup" >
       <ioSpecification>
         <inputSet>
         </inputSet>

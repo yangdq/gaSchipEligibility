@@ -1,6 +1,8 @@
 package com.maximus.rule.internal;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 public class DroolsInternal {
 	private Integer retroCount = 0;
@@ -8,6 +10,8 @@ public class DroolsInternal {
 	private int lowestFPLPct = 2000;
 	private Date currentMonth = new Date();
 	private Boolean familyHasVerfieidIncome = false;
+	private List<String> acceptedIncomeSubTypes = new ArrayList<String>();
+	private List<String> acceptedExpenseTypes = new ArrayList<String>();
 
 	public Integer getRetroCount() {
 		return retroCount;
@@ -47,6 +51,24 @@ public class DroolsInternal {
 
 	public void setFamilyHasVerfieidIncome(Boolean familyHasVerfieidIncome) {
 		this.familyHasVerfieidIncome = familyHasVerfieidIncome;
+	}
+
+	public List<String> getAcceptedIncomeSubTypes() {
+		return acceptedIncomeSubTypes;
+	}
+
+	public void setAcceptedIncomeSubTypes(List<String> acceptedIncomeSubTypes) {
+		this.acceptedIncomeSubTypes = acceptedIncomeSubTypes;
+	}
+
+	public List<String> getAcceptedExpenseTypes() {
+		return acceptedExpenseTypes;
+	}
+
+	public void setAcceptedExpenseTypes(List<String> acceptedExpenseTypes) {
+		this.acceptedExpenseTypes = acceptedExpenseTypes;
 	}	
+	
+	
 	
 }
