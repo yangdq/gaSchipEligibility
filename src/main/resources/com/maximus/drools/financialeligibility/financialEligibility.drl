@@ -21,6 +21,7 @@ import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityNotEligibleReason
 import com.psi.vida.generatedenums.ListOfValuesUtil.MemberNotVerifiedReasonEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.IncomeTypeEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.VerificationStatusEnum;
+import com.psi.vida.generatedenums.ListOfValuesUtil.InsRefDeterminationEnum;
 import com.psi.vida.util.rules.MAGIHouseholdTypeEnum;
 
 import java.math.RoundingMode;
@@ -46,6 +47,28 @@ global EligibilityOutput eligibilityOutput;
 global EligibilityInput eligibilityInput;
 global DroolsInternal internalData;
 global Date determinationDate;
+
+function boolean isOnMedicaid(PersonTO person){
+	if("ON_MEDICAID".equals(person.getMdcdMatchStatus())){
+		if(person.getMdcdMatchEndDate() == null){
+			return true;
+		}else if(person.getMdcdMatchEndDate().after(DateUtil.addDays(person.getMdcdMatchDate(), 92))){
+			return true;
+		}
+	}
+	return false;
+}
+
+function boolean insuranceReferralNotApprovedYet(PersonTO person){
+	if(person.getInsuranceReferralStatus() == null){
+		return true;
+	}else if(person.getInsuranceReferralStatus().equals(InsRefDeterminationEnum.DENIED.getValue())){
+		return false;
+	}else{
+		return false;
+}
+
+}
 
 function void addElgResultStatusReason(EligibilityResultTO result, String statusReason){
 	boolean isNotMatched = true;
@@ -975,13 +998,341 @@ rule "InitializeEligibilityResult1"
 end
 
 
-/*
-financialMdcd
-chipDetermination
-processChipResults
-nonFinancialMdcd
+rule "DenyChildNotApplying"
+	ruleflow-group "chipDetermination"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), applyingForBenefitsFlag == null || ! applyingForBenefitsFlag);
+         eligibility_result: EligibilityResultTO(person == applicant);
+       then 
+         eligibility_result.schipStatus = "NOT_ELIGIBLE";
+         addElgResultStatusReason(eligibility_result, "NOT_APPLYING_FOR_BENEFITS");
+         update(eligibility_result);         
+         EligibilityUtils.debug("Add Denial Reason of 'NOT_APPLYING_FOR_BENEFITS' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+rule "DenyInsuranceReferral"
+	ruleflow-group "chipDetermination"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval ("DENIED".equals(applicant.insuranceReferralStatus));
+       then 
+         eligibility_result.schipStatus = "NOT_ELIGIBLE";
+         addElgResultStatusReason(eligibility_result, "INSURANCE_IN_LAST_6_MONTHS");
+         update(eligibility_result);         
+         EligibilityUtils.debug("Add Denial Reason of 'INSURANCE_IN_LAST_6_MONTHS' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+rule "DenyOnMedicaid"
+	ruleflow-group "chipDetermination"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval (isOnMedicaid(applicant));
+       then 
+         eligibility_result.schipStatus = "NOT_ELIGIBLE";
+         addElgResultStatusReason(eligibility_result, "ON_MEDICAID");
+         update(eligibility_result);         
+         EligibilityUtils.debug("Add Denial Reason of 'ON_MEDICAID' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+rule "DenyOtherInsurance"
+	ruleflow-group "chipDetermination"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), hasInsuranceFlag != null && hasInsuranceFlag);
+         eligibility_result: EligibilityResultTO(person == applicant);
+
+       then 
+         eligibility_result.schipStatus = "NOT_ELIGIBLE";
+         addElgResultStatusReason(eligibility_result, "HAS_OTHER_INSURANCE");
+         update(eligibility_result);         
+         EligibilityUtils.debug("Add Denial Reason of 'HAS_OTHER_INSURANCE' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+rule "DenyAgeOver19"
+	ruleflow-group "chipDetermination"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval (eligibility_result.age.longValue() >= 19);
+       then 
+         eligibility_result.schipStatus = "NOT_ELIGIBLE";
+         addElgResultStatusReason(eligibility_result, "OVER_AGE");
+         update(eligibility_result);         
+         EligibilityUtils.debug("Add Denial Reason of 'OVER_AGE' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+rule "DenyNotCitizen"
+	ruleflow-group "chipDetermination"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), usCitizenshipVerifiedFlag != null && usCitizenshipVerifiedFlag);
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval ("NOT_QUALIFIED_NON_CITIZEN".equals(applicant.usCitizenshipStatus) ||
+         	"NOT_A_CITIZEN".equals(applicant.usCitizenshipStatus));
+       then 
+         eligibility_result.schipStatus = "NOT_ELIGIBLE";
+         addElgResultStatusReason(eligibility_result, "NON_CITIZEN");
+         update(eligibility_result);         
+         EligibilityUtils.debug("Add Denial Reason of 'citizenship' to Eligibility Result of Applicant " + applicant.firstName);
+
+         
+
+end
+
+rule "DenyOutOfState"
+	ruleflow-group "chipDetermination"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         address: AccountAddressTO();
+         eval (!( "GA".equals(address.state)));
+       then 
+         eligibility_result.schipStatus = "NOT_ELIGIBLE";
+         addElgResultStatusReason(eligibility_result, "OUT_OF_STATE");
+         update(eligibility_result);         
+         EligibilityUtils.debug("Add Denial Reason of 'OUT_OF_STATE' to Eligibility Result of Applicant " + applicant.firstName);
+end
 
 
-*/
+rule "ChipEligibilityDetermination"
+	ruleflow-group "processChipResults"
+	salience 3000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), status.equals("MEMBER_VERIFIED"));
+         eligibility_result: EligibilityResultTO(person == applicant, statusReasons.isEmpty());
+         account: AccountTO(accountStatus.equals("COMPLIANT")) from eligibilityInput.account;
+         eval (!(account.sentG04i));
+       then 
+         eligibility_result.schipStatus = "ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Sset SCHIP Eligibility Status to 'ELIGIBLE' for Applicant " + applicant.firstName);
+
+end
+
+rule "ChipPendingInsuranceReferral"
+	ruleflow-group "processChipResults"
+	salience 5000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), isNullSafeTrue(memberLostInsuranceFlag));
+         eligibility_result: EligibilityResultTO(person == applicant, schipStatus.equals("PENDING_ELIGIBILITY"));
+         eval (insuranceReferralNotApprovedYet(applicant));
+       then 
+         addElgResultStatusReason(eligibility_result, "OUTSTANDING_INSURANCE_REFERRAL");
+         update(eligibility_result);         
+         EligibilityUtils.debug("SCHIP Eligibility PENDING for 'OUTSTANDING_INSURANCE_REFERRAL' reason on person " + applicant.firstName);
+
+         
+end
+
+rule "FianncialMdcdHoldSchip"
+	ruleflow-group "processChipResults"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval ((("PENDING_ELIGIBILITY".equals(eligibility_result.mdcdStatus))
+         	&& ("ELIGIBLE".equals(eligibility_result.schipStatus))));
+       then 
+         eligibility_result.schipStatus = "PENDING_ELIGIBILITY";
+         update (eligibility_result);       
+         EligibilityUtils.debug("Keep SCHIP Pending since child financailly qualifies MDCD on Applicant " + applicant.firstName);
+         
+         
+end
+
+rule "SetSchipIncomeLimit"
+	ruleflow-group "processChipResults"
+	salience 3000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+       then        
+         eligibility_result.incomeLimit = EligibilityUtils.monthlyAmountOnFplPercentage(eligibilityInput.monthlyBaseAmount,
+         						 eligibilityInput.monthlyPerPersonAmount, eligibility_result.xxiFamilySize, java.lang.Long.valueOf((long) 247 ));
+         update(eligibility_result)
+         EligibilityUtils.debug("Sset income limit based on MAGI household amount for Applicant " + applicant.firstName);
+         
+end
+
+rule "DenyMdcdNotApplying"
+	ruleflow-group "nonFinancialMdcd"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), applyingForBenefitsFlag == null || ! applyingForBenefitsFlag);
+         eligibility_result: EligibilityResultTO(person == applicant);
+       then 
+         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Deny MDCD for 'NOT_APPLYING_FOR_BENEFITS' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+
+rule "DenyMdcdOnMedicaid"
+	ruleflow-group "nonFinancialMdcd"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval (isOnMedicaid(applicant));
+       then 
+         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Deny Mdcd for 'ON_MEDICAID' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+rule "DenyMdcdOtherInsurance"
+	ruleflow-group "nonFinancialMdcd"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), hasInsuranceFlag != null && hasInsuranceFlag);
+         eligibility_result: EligibilityResultTO(person == applicant);
+
+       then 
+         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Deny mdcd for 'HAS_OTHER_INSURANCE' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+rule "DenyMdcdAgeOver19"
+	ruleflow-group "nonFinancialMdcd"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval (eligibility_result.age.longValue() >= 19);
+       then 
+         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Deny mdcd for 'OVER_AGE' to Eligibility Result of Applicant " + applicant.firstName);
+
+end
+
+rule "DenyMdcdNotCitizen"
+	ruleflow-group "nonFinancialMdcd"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), usCitizenshipVerifiedFlag != null && usCitizenshipVerifiedFlag);
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval ("NOT_QUALIFIED_NON_CITIZEN".equals(applicant.usCitizenshipStatus) ||
+         	"NOT_A_CITIZEN".equals(applicant.usCitizenshipStatus));
+       then 
+         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Deny mdcd for 'citizenship' to Eligibility Result of Applicant " + applicant.firstName);
+
+         
+
+end
+
+rule "DenyMdcdOutOfState"
+	ruleflow-group "nonFinancialMdcd"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         address: AccountAddressTO();
+         eval (!( "GA".equals(address.state)));
+       then 
+         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Deny mdcd for 'OUT_OF_STATE' to Eligibility Result of Applicant " + applicant.firstName);
+end
+
+rule "DenyNotCompliantAccountMember"
+	ruleflow-group "nonFinancialMdcd"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         account: AccountTO(!("COMPLIANT".equals(accountStatus))) from eligibilityInput.account;
+
+       then 
+         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Deny mdcd for account is not compliant to Eligibility Result of Applicant " + applicant.firstName);
+end
+
+rule "DenyNotVerifiedMember"
+	ruleflow-group "nonFinancialMdcd"
+	salience 1000
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild(), !("MEMBER_VERIFIED".equals(status)));
+         eligibility_result: EligibilityResultTO(person == applicant);
+       then 
+         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
+         update(eligibility_result);         
+         EligibilityUtils.debug("Deny mdcd for member is not verified yet to Eligibility Result of Applicant " + applicant.firstName);
+end
+
+rule "EligibleForMdcdReferral"
+	ruleflow-group "nonFinancialMdcd"
+	salience 100
+	no-loop true
+	
+      when 
+         applicant: PersonTO(isChild());
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval (((("PENDING_ELIGIBILITY".equals(eligibility_result.mdcdStatus))
+         	&& ("PENDING_ELIGIBILITY".equals(eligibility_result.schipStatus)))
+         	&& ("NOT_ON_MEDICAID".equals(applicant.mdcdMatchStatus))));
+       then 
+         addElgResultStatusReason(eligibility_result, "MEDICAID_REFERRAL");
+         update (eligibility_result);        
+         EligibilityUtils.debug("Add SCHIP Status reason of MEDICAID_REFERRAL on Applicant " + applicant.firstName);
+
+end
 
 
