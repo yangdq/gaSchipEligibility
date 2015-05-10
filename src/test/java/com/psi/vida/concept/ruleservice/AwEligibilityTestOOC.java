@@ -12,9 +12,8 @@
 package com.psi.vida.concept.ruleservice;
 
 
-import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -22,7 +21,6 @@ import org.junit.Test;
 
 import com.psi.vida.business.to.AccountTO;
 import com.psi.vida.business.to.EligibilityResultTO;
-import com.psi.vida.business.to.EligibilityStatusReasonTO;
 import com.psi.vida.business.to.PersonTO;
 import com.psi.vida.business.vo.EligibilityInput;
 import com.psi.vida.concept.ruleservice.util.RuleSetOOCTestDataUtil;
@@ -50,6 +48,8 @@ public class AwEligibilityTestOOC extends AwVidaRuleEngineBaseTestCase{
     public void setUp(){
     	account = RuleSetOOCTestDataUtil.createCompleteAccount();
     	input.setAccount(account);
+    	input.setMonthlyBaseAmount(new BigDecimal(634.17d));
+    	input.setMonthlyPerPersonAmount(new BigDecimal(346.67d));
     }
     
     @Test

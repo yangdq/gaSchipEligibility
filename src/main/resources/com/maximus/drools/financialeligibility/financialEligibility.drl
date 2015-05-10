@@ -8,7 +8,7 @@ import com.psi.vida.business.to.*;
 import com.psi.vida.util.rules.MAGIHousehold;
 import com.psi.vida.business.eligibilitymanagement.processstatus.EligibilityPrescreenStatusEnum;
 import java.util.Iterator;
-import com.psi.vida.business.to.MemberStatusReasonTO
+import com.psi.vida.business.to.MemberStatusReasonTO;
 import com.psi.vida.generatedenums.ListOfValuesUtil.AddressTypeEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.SoftDeleteEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.AccountCompliantReasonEnum;
@@ -45,8 +45,45 @@ import com.maximus.rule.internal.DroolsInternal;
 
 global EligibilityOutput eligibilityOutput;
 global EligibilityInput eligibilityInput;
-global DroolsInternal internalData;
 global Date determinationDate;
+
+function String identifyDeterminationType(AccountTO acct){
+	if(acct.getDeterminationType() != null && acct.getDeterminationType().trim().length() > 0){
+		return acct.getDeterminationType();
+	}else{
+		boolean allIncomesMdcdReferralVerified = true;
+		for(int i = 0; i < acct.getPersons().size() ; i++){
+			PersonTO person = (PersonTO) acct.getPersons().get(i);
+			for(int j = 0; j < person.getIncomes().size() ; j++){
+				IncomeTO income = (IncomeTO) person.getIncomes().get(j);
+				if(! "VERIFIED".equals(income.getVerficationStatus())){
+					allIncomesMdcdReferralVerified = false;
+					break;
+				}else{
+					if(income.getValidations() == null || income.getValidations().size() < 1){
+						allIncomesMdcdReferralVerified = false;
+						break;					
+					}
+					FinanceValidationTO fv = (FinanceValidationTO) income.getValidations().get(0);
+					if(fv == null || fv.getDocumentId() == null || ! "MEDICAID_SUCCESS".equals(fv.getComments())){
+						allIncomesMdcdReferralVerified = false;
+						break;
+					}
+				}
+			}
+			if(! allIncomesMdcdReferralVerified){
+				break;
+			}
+		}
+		if(allIncomesMdcdReferralVerified){
+			return "MEDICAID_SUCCESS";
+		}else{
+			return "REGULAR";
+		}
+	}
+}
+
+
 
 function boolean isOnMedicaid(PersonTO person){
 	if("ON_MEDICAID".equals(person.getMdcdMatchStatus())){
@@ -193,6 +230,11 @@ function EligibilityResultTO createElgResult(PersonTO applicant){
 	elgResult.setAccountRelationshipId(applicant.getAccountRelationshipId());
 	elgResult.setMemberStatus(applicant.getStatus());
 	elgResult.setPerson(applicant);
+	// temp place holder for age
+	elgResult.setAge(1000L);
+	elgResult.setXxiFamilySize(0L);
+	elgResult.setXxiIncome(0.0d);
+	elgResult.setFivePctDeductedIncome(0.0d);
 	return elgResult;
 }
 
@@ -266,6 +308,11 @@ rule "eligibilityInitialSetup"
 		String[] expenseTypeArray = {"ALIMONY", "STUDENT_LOAN_INTEREST", "OTHER"};
 		internalData.setAcceptedIncomeSubTypes(java.util.Arrays.asList(incomeSubTypeArray));
 		internalData.setAcceptedExpenseTypes(java.util.Arrays.asList(expenseTypeArray));
+		if(eligibilityInput.account.determinationType == null){
+			eligibilityInput.account.determinationType = identifyDeterminationType(eligibilityInput.account);	
+		}
+		insert(internalData);
+		EligibilityUtils.debug("Eligibility Determination Type is " + eligibilityInput.account.determinationType);
 
 end
 
@@ -347,7 +394,7 @@ rule "calculateApplicantAge"
 	
     when
         applicant: com.psi.vida.business.to.PersonTO(isChild(), dateOfBirth != null)
-        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), age == null)
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), age == 1000)
     then
     	modify(eligibility_result){
    			setAge(java.lang.Long.valueOf((long)(com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth)))); 		
@@ -362,11 +409,13 @@ rule "scanForVerifiedIncome"
 	no-loop true
 	
       when 
+      	internalData1: DroolsInternal();
          person: PersonTO();
          exists IncomeTO("VERIFIED".equals(verficationStatus), !("SUPPLEMENTAL_SECURITY_INCOME".equals(incomeSubtype)) )  from person.incomes;
 
        then 
-         internalData.familyHasVerfieidIncome = true;
+         internalData1.familyHasVerfieidIncome = true;
+         update(internalData1);
          EligibilityUtils.debug("Family has verified incomes.  Eligibility preview should use verified incomes only");
       
 end
@@ -447,9 +496,8 @@ rule "magiHouseholdType_0"
          eval (isNullSafeTrue(applicant.taxFilerFlag)  && ! isNullSafeTrue(applicant.taxDependentFlag));
 
        then 
-         modify (magi_household){
-         	setHouseholdType(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1);
-         }
+         magi_household.householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1;
+         update(magi_household);
          EligibilityUtils.debug("MAGI Household Type is TAX_HOUSEHOLD1");
       
 end
@@ -466,9 +514,8 @@ rule "magiHouseholdType_1"
 
 
        then 
-         modify (magi_household){
-         	setHouseholdType(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1);
-         }
+         magi_household.householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2;
+         update(magi_household);
          EligibilityUtils.debug("MAGI Household Type is TAX_HOUSEHOLD2");
       
 end
@@ -484,9 +531,8 @@ rule "magiHouseholdType_2"
         eval (isNullSafeTrue(applicant.taxFilerFlag) && isNullSafeTrue(applicant.taxDependentFlag) && magi_household.taxDependentException);
 
        then 
-         modify (magi_household){
-         	setHouseholdType(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1);
-         }
+         magi_household.householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
+         update(magi_household);
          EligibilityUtils.debug("MAGI Household Type is Medicaid_HOUSEHOLD");
       
 end
@@ -503,9 +549,8 @@ rule "magiHouseholdType_3"
 
 
        then 
-         modify (magi_household){
-         	setHouseholdType(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1);
-         }
+         magi_household.householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
+         update(magi_household);
          EligibilityUtils.debug("MAGI Household Type is Medicaid_HOUSEHOLD");
       
 end
@@ -522,9 +567,8 @@ rule "magiHouseholdType_4"
 
 
        then 
-         modify (magi_household){
-         	setHouseholdType(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1);
-         }
+         magi_household.householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2;
+         update(magi_household);
          EligibilityUtils.debug("MAGI Household Type is TAX_HOUSEHOLD2");
       
 end
@@ -541,9 +585,8 @@ rule "magiHouseholdType_5"
 
 
        then 
-         modify (magi_household){
-         	setHouseholdType(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1);
-         }
+         magi_household.householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
+         update(magi_household);
          EligibilityUtils.debug("MAGI Household Type is Medicaid_HOUSEHOLD");
       
 end
@@ -554,7 +597,7 @@ rule "nonFiler_addChildren"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold(householdType.equals(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
          person: PersonTO() from magi_household.person;
          child: PersonTO(this != person, isChild());
          exists FamilyRelationshipTO(toPersonTO.equals(person)
@@ -564,9 +607,9 @@ rule "nonFiler_addChildren"
          	&& DateUtil.currentAge(child.dateOfBirth) < 19);
          	
        then 
-         modify (magi_household){
-         	addMember(child);
-         }          
+         
+         magi_household.addMember(child);
+         update (magi_household);          
          EligibilityUtils.debug("Add tax dependent " + child.firstName + " to MEDICAID_HOUSEHOLD of tax dependent " + person.firstName);
          
       
@@ -578,7 +621,7 @@ rule "nonFiler_addGrandChildrenSiblings"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold(householdType.equals(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
          grandchild1: PersonTO() from magi_household.person;
          non_tax_filer_parent: PersonTO(this != grandchild1, isParent(this));
          sibling: PersonTO(this != grandchild1 && this != non_tax_filer_parent, isChild());
@@ -593,9 +636,9 @@ rule "nonFiler_addGrandChildrenSiblings"
 
 
        then 
-         modify (magi_household){
-         	addMember(sibling);
-         }          
+         
+         magi_household.addMember(sibling);
+         update (magi_household);     
          EligibilityUtils.debug("Add sibling " + sibling.firstName + " to MEDICAID_HOUSEHOLD of child " + grandchild1.firstName);
 
       
@@ -607,9 +650,9 @@ rule "nonFiler_addParents"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold(householdType.equals(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
          child: PersonTO() from magi_household.person;
-         non_tax_filer_parent: PersonTO(this != child, isParent(this));
+         non_tax_filer_parent: PersonTO(! this.equals(child), isParent(this));
          exists FamilyRelationshipTO(toPersonTO.equals(non_tax_filer_parent)
          	&& (relationshipType == "CHILD" || relationshipType =="STEP_CHILD")) from child.relationships;
          eval (liveInTheFamily(non_tax_filer_parent)
@@ -618,9 +661,8 @@ rule "nonFiler_addParents"
 
 
        then 
-         modify (magi_household){
-         	addMember(non_tax_filer_parent);
-         }          
+         magi_household.addMember(non_tax_filer_parent);
+         update(magi_household);         
          EligibilityUtils.debug("Add non tax filer parent " + non_tax_filer_parent.firstName + " to MEDICAID_HOUSEHOLD of child " + child.firstName);
 
       
@@ -632,7 +674,7 @@ rule "nonFiler_addSiblings"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold((householdType.equals(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD)));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
          child1: PersonTO() from magi_household.person;
          non_tax_filer_parent: PersonTO(this != child1, isParent(this));
          sibling: PersonTO(this != child1, this != non_tax_filer_parent, isChild());
@@ -646,9 +688,9 @@ rule "nonFiler_addSiblings"
          	&& DateUtil.currentAge(sibling.dateOfBirth) < 19);
 
        then 
-         modify (magi_household){
-         	addMember(sibling);
-         }          
+         
+         magi_household.addMember(sibling);
+         update (magi_household);     
          EligibilityUtils.debug("Add sibling " + sibling.firstName + " to MEDICAID_HOUSEHOLD of child " + child1.firstName);
 
       
@@ -660,7 +702,7 @@ rule "nonFiler_addSpouseLivingTogether"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold((householdType.equals(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD)));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
          person: PersonTO() from magi_household.person;
          spouse: PersonTO(this != person, isParent(this));
          account: AccountTO() from eligibilityInput.account;
@@ -671,9 +713,9 @@ rule "nonFiler_addSpouseLivingTogether"
          	&& liveInTheFamily(person)
          	&& liveInTheFamily(spouse) );
        then 
-         modify (magi_household){
-         	addMember(spouse);
-         }          
+         
+         magi_household.addMember(spouse);
+         update (magi_household);    
          EligibilityUtils.debug("Add spouse " + spouse.firstName + " to MEDICAID_HOUSEHOLD of person " + person.firstName);
       
 end
@@ -684,7 +726,7 @@ rule "taxFiler1_addSpouseLivingTogether"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold((householdType.equals(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1)));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1.equals(householdType));
          tax_filer: PersonTO() from magi_household.person;
          spouse: PersonTO(this != tax_filer, isParent(spouse));
          account: AccountTO() from eligibilityInput.account;
@@ -695,9 +737,9 @@ rule "taxFiler1_addSpouseLivingTogether"
          	&& liveInTheFamily(spouse) );
 
        then 
-         modify (magi_household){
-         	addMember(spouse);
-         }          
+         
+         magi_household.addMember(spouse);
+         update (magi_household);   
          EligibilityUtils.debug("Add spouse " + spouse.firstName + " to TAX_HOUSEHOLD1 of tax filer " + tax_filer.firstName);
 
       
@@ -709,15 +751,15 @@ rule "taxFiler1_addTaxDependent"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold((householdType.equals(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1)));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1.equals(householdType));
          tax_filer: PersonTO() from magi_household.person;
          tax_dependent: PersonTO(this != tax_filer);
          TaxRelationshipTO(toPersonTO == tax_filer) from tax_dependent.taxRelationships;
 
        then 
-         modify (magi_household){
-         	addMember(tax_dependent);
-         }          
+         
+         magi_household.addMember(tax_dependent);
+         update (magi_household);
          EligibilityUtils.debug("Add tax dependent " + tax_dependent.firstName + " to TAX_HOUSEHOLD1 of tax filer " + tax_filer.firstName);
 
       
@@ -729,7 +771,7 @@ rule "taxFiler2_addTaxDependent"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold((householdType.equals(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2)));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2.equals(householdType));
          tax_dependent1: PersonTO() from magi_household.person;
          tax_filer: PersonTO(this != tax_dependent1, isNullSafeTrue(taxFilerFlag));
          tax_dependent2: PersonTO(this != tax_dependent1, this != tax_filer);
@@ -737,9 +779,9 @@ rule "taxFiler2_addTaxDependent"
          tax_relationship_2: TaxRelationshipTO(toPersonTO == tax_filer) from tax_dependent2.taxRelationships;
 
        then 
-         modify (magi_household){
-         	addMember(tax_dependent2);
-         }          
+         
+         magi_household.addMember(tax_dependent2);
+         update (magi_household);      
          EligibilityUtils.debug("Add tax dependent " + tax_dependent2.firstName + " to TAX_HOUSEHOLD2 of tax dependent " + tax_dependent1.firstName);
 
       
@@ -751,15 +793,15 @@ rule "taxFiler2_addTaxFiler"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold((householdType.equals(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2)));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2.equals(householdType));
          tax_dependent: PersonTO() from magi_household.person;
          tax_filer: PersonTO(this != tax_dependent, isNullSafeTrue(taxFilerFlag));
          TaxRelationshipTO(toPersonTO == tax_filer) from tax_dependent.taxRelationships;
 
        then 
-         modify (magi_household){
-         	addMember(tax_filer);
-         }          
+         
+         magi_household.addMember(tax_filer);
+         update (magi_household);      
          EligibilityUtils.debug("Add tax filer " + tax_filer.firstName  + " to TAX_HOUSEHOLD2 of tax filer " + tax_dependent.firstName);
 
       
@@ -771,7 +813,7 @@ rule "taxFiler2_addTaxFilerSpouseLivingTogether"
 	no-loop true
 	
       when 
-         magi_household: MAGIHousehold((householdType.equals(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2)));
+         magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2.equals(householdType));
          tax_dependent: PersonTO() from magi_household.person;
          tax_filer: PersonTO(this != tax_dependent, isParent(this));
          tax_filer_spouse: PersonTO(this != tax_dependent, this != tax_filer, isParent(this));
@@ -782,9 +824,9 @@ rule "taxFiler2_addTaxFilerSpouseLivingTogether"
          	&& liveInTheFamily(tax_filer)
          	&& liveInTheFamily(tax_filer_spouse));
        then 
-         modify (magi_household){
-         	addMember(tax_filer_spouse);
-         }          
+         
+         magi_household.addMember(tax_filer_spouse);
+         update (magi_household);       
          EligibilityUtils.debug("Add tax Add tax filer spouse living together " + tax_filer_spouse.firstName + " to TAX_HOUSEHOLD2 of tax dependent " + tax_dependent.firstName);
 
       
@@ -800,9 +842,8 @@ rule "CalculateHouseholdIncome"
          magi_household: MAGIHousehold(person == person);
          counted_income: IncomeTO() from magi_household.incomes;
        then 
-         modify (magi_household){
-         	addHouseholdIncome(incomeMonthlyAmount(counted_income));
-         }          
+         magi_household.addHouseholdIncome(incomeMonthlyAmount(counted_income));
+         update(magi_household);       
          EligibilityUtils.debug("Add " + incomeMonthlyAmount(counted_income) + " to household of " + person.firstName + " to income total " + magi_household.householdIncome);
 
 
@@ -818,11 +859,10 @@ rule "CountHouseholdSize"
       when 
          magi_household: MAGIHousehold();
          household_member: PersonTO() from magi_household.members;
-         eval (household_member.pregnant);
+         eval (household_member.pregnant != null && household_member.pregnant);
        then 
-         modify (magi_household){
-         	addPregnantCount(effectiveHouseholdCount(determinationDate, household_member) - 1);
-         }          
+         magi_household.addPregnantCount(effectiveHouseholdCount(determinationDate, household_member) - 1);
+         update(magi_household);        
          EligibilityUtils.debug("Add extra household headcount of  " + (effectiveHouseholdCount(determinationDate, household_member) - 1) + 
          " to household of " + household_member.firstName + " due to pregnancy");
 
@@ -836,9 +876,10 @@ rule "FilterHouseholdDeduction"
       when 
          magi_household: MAGIHousehold();
          household_member: PersonTO() from magi_household.members;
-         member_deduction: ExpenseTO(internalData.acceptedExpenseTypes contains expenseType) from household_member.expenses;
+         internalData2: DroolsInternal();
+         member_deduction: ExpenseTO(internalData2.acceptedExpenseTypes contains expenseType) from household_member.expenses;
          
-         eval ((isParent(household_member) || 
+         eval (((isParent(household_member) || 
             	(household_member.isChild() && 
             	   (thresholdAnnualIncomeOfType(IncomeTypeEnum.EARNED, household_member) > 6200.0d
          	        || thresholdAnnualIncomeOfType(IncomeTypeEnum.UNEARNED, household_member) > 1000.0d)
@@ -848,13 +889,12 @@ rule "FilterHouseholdDeduction"
          	        && (magi_household.householdType == MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1 ||
          	        magi_household.householdType == MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2))
          	    )
-         	  )
+         	  )) && ! magi_household.expenses.contains(member_deduction)
             );
        then 
-         modify (magi_household){
-         	addExpense(member_deduction);
-         }          
-         EligibilityUtils.debug("Add expense of type  " + member_deduction.expenseType + " to household of " + household_member.firstName);
+         magi_household.addExpense(member_deduction);
+         update (magi_household);       
+         EligibilityUtils.debug("Add expense of type  " + member_deduction.expenseType + " to household of " + magi_household.person.firstName);
 
 end
 
@@ -866,9 +906,10 @@ rule "FilterHouseholdIncome"
       when 
         magi_household: rules.MAGIHousehold();
          household_member: PersonTO() from magi_household.members;
-         member_income: IncomeTO(incomeSubtype != null, incomeVerified(this), internalData.acceptedIncomeSubTypes contains incomeSubtype) from household_member.incomes;
+         internalData3: DroolsInternal();
+         member_income: IncomeTO(incomeSubtype != null, incomeVerified(this), internalData3.acceptedIncomeSubTypes contains incomeSubtype) from household_member.incomes;
          
-         eval ((isParent(household_member) || 
+         eval (((isParent(household_member) || 
             	(household_member.isChild() && 
             	   (thresholdAnnualIncomeOfType(IncomeTypeEnum.EARNED, household_member) > 6200.0d
          	        || thresholdAnnualIncomeOfType(IncomeTypeEnum.UNEARNED, household_member) > 1000.0d)
@@ -878,13 +919,13 @@ rule "FilterHouseholdIncome"
          	        && (magi_household.householdType == MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1 ||
          	        magi_household.householdType == MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2))
          	    )
-         	  )
+         	  )) && ! magi_household.incomes.contains(member_income)
             );
        then 
-         modify (magi_household){
-         	addIncome(member_income);
-         }          
-         EligibilityUtils.debug("Add income of type " + member_income.incomeSubtype + " to household of " + household_member.firstName);
+         
+         magi_household.addIncome(member_income);
+         update (magi_household); 
+         EligibilityUtils.debug("Add income of type " + member_income.incomeSubtype + " to household of " + magi_household.person.firstName);
 
 end
 
@@ -896,9 +937,10 @@ rule "FilterHouseholdIncomePreviewOnly"
       when 
         magi_household: rules.MAGIHousehold();
          household_member: PersonTO() from magi_household.members;
-         member_income: IncomeTO(incomeSubtype != null, ! incomeVerified(this), internalData.acceptedIncomeSubTypes contains incomeSubtype) from household_member.incomes;
+         internalData4: DroolsInternal();
+         member_income: IncomeTO(incomeSubtype != null, ! incomeVerified(this), internalData4.acceptedIncomeSubTypes contains incomeSubtype) from household_member.incomes;
          
-         eval ( eligibilityInput.preview &&
+         eval ( eligibilityInput.preview && 
          (isParent(household_member) || 
             	(household_member.isChild() && 
             	   (thresholdAnnualIncomeOfType(IncomeTypeEnum.EARNED, household_member) > 6200.0d
@@ -913,10 +955,10 @@ rule "FilterHouseholdIncomePreviewOnly"
             );
 
        then 
-         modify (magi_household){
-         	addIncome(member_income);
-         }          
-         EligibilityUtils.debug("Add income of type " + member_income.incomeSubtype + " to household of " + household_member.firstName);
+         
+         magi_household.addIncome(member_income);
+         update (magi_household);    
+         EligibilityUtils.debug("Add income of type " + member_income.incomeSubtype + " to household of " + magi_household.person.firstName);
 
 end
 
@@ -928,9 +970,9 @@ rule "FivePercentDeduction"
       when 
          magi_household: MAGIHousehold();
        then 
-         modify (magi_household){
-         	setFivePctDeduction(Math.ceil(0.05d * EligibilityUtils.monthlyAmountOnFplPercentage(eligibilityInput.getMonthlyBaseAmount(), eligibilityInput.getMonthlyPerPersonAmount(), (long)magi_household.householdSize, 100L)));
-         }          
+         
+         magi_household.setFivePctDeduction(Math.ceil(0.05d * EligibilityUtils.monthlyAmountOnFplPercentage(eligibilityInput.getMonthlyBaseAmount(), eligibilityInput.getMonthlyPerPersonAmount(), (long)magi_household.householdSize, 100L)));
+         update (magi_household);   
          EligibilityUtils.debug("Calculate MAGI 5% Deduction");
 
 end
@@ -945,9 +987,9 @@ rule "SubtractHouseholdDeduction"
          magi_household: rules.MAGIHousehold(person == per);
          counted_expense: ExpenseTO() from magi_household.expenses;
        then 
-         modify (magi_household){
-         	subtractHouseholdIncome(expenseMonthlyAmount(counted_expense));
-         }          
+         
+         magi_household.subtractHouseholdIncome(expenseMonthlyAmount(counted_expense));
+         update (magi_household);       
          EligibilityUtils.debug("Subtract " + expenseMonthlyAmount(counted_expense) + " from household of "
           + per.firstName + " to income total " + magi_household.householdIncome);
 
