@@ -1067,9 +1067,11 @@ rule "DenyChildNotApplying"
          applicant: PersonTO(isChild(), applyingForBenefitsFlag == null || ! applyingForBenefitsFlag);
          eligibility_result: EligibilityResultTO(person == applicant);
        then 
-         eligibility_result.schipStatus = "NOT_ELIGIBLE";
-         addElgResultStatusReason(eligibility_result, "NOT_APPLYING_FOR_BENEFITS");
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	schipStatus = "NOT_ELIGIBLE";
+         	addElgResultStatusReason(eligibility_result, "NOT_APPLYING_FOR_BENEFITS");
+         }
+         //update(eligibility_result);         
          EligibilityUtils.debug("Add Denial Reason of 'NOT_APPLYING_FOR_BENEFITS' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1084,9 +1086,11 @@ rule "DenyInsuranceReferral"
          eligibility_result: EligibilityResultTO(person == applicant);
          eval ("DENIED".equals(applicant.insuranceReferralStatus));
        then 
-         eligibility_result.schipStatus = "NOT_ELIGIBLE";
-         addElgResultStatusReason(eligibility_result, "INSURANCE_IN_LAST_6_MONTHS");
-         update(eligibility_result);         
+       	modify(eligibility_result){
+	         schipStatus = "NOT_ELIGIBLE";
+	         addElgResultStatusReason(eligibility_result, "INSURANCE_IN_LAST_6_MONTHS");
+         }
+         //update(eligibility_result);         
          EligibilityUtils.debug("Add Denial Reason of 'INSURANCE_IN_LAST_6_MONTHS' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1101,9 +1105,11 @@ rule "DenyOnMedicaid"
          eligibility_result: EligibilityResultTO(person == applicant);
          eval (isOnMedicaid(applicant));
        then 
-         eligibility_result.schipStatus = "NOT_ELIGIBLE";
-         addElgResultStatusReason(eligibility_result, "ON_MEDICAID");
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+	         schipStatus = "NOT_ELIGIBLE";
+	         addElgResultStatusReason(eligibility_result, "ON_MEDICAID");
+         }
+         //update(eligibility_result);         
          EligibilityUtils.debug("Add Denial Reason of 'ON_MEDICAID' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1118,9 +1124,11 @@ rule "DenyOtherInsurance"
          eligibility_result: EligibilityResultTO(person == applicant);
 
        then 
-         eligibility_result.schipStatus = "NOT_ELIGIBLE";
-         addElgResultStatusReason(eligibility_result, "HAS_OTHER_INSURANCE");
-         update(eligibility_result);         
+       	 modify(eligibility_result){       
+	         schipStatus = "NOT_ELIGIBLE";
+	         addElgResultStatusReason(eligibility_result, "HAS_OTHER_INSURANCE");
+         }
+         //update(eligibility_result);         
          EligibilityUtils.debug("Add Denial Reason of 'HAS_OTHER_INSURANCE' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1135,9 +1143,11 @@ rule "DenyAgeOver19"
          eligibility_result: EligibilityResultTO(person == applicant, age != null);
          eval (eligibility_result.age.longValue() >= 19);
        then 
-         eligibility_result.schipStatus = "NOT_ELIGIBLE";
-         addElgResultStatusReason(eligibility_result, "OVER_AGE");
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+	         schipStatus = "NOT_ELIGIBLE";
+	         addElgResultStatusReason(eligibility_result, "OVER_AGE");
+         }
+         //update(eligibility_result);         
          EligibilityUtils.debug("Add Denial Reason of 'OVER_AGE' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1153,9 +1163,11 @@ rule "DenyNotCitizen"
          eval ("NOT_QUALIFIED_NON_CITIZEN".equals(applicant.usCitizenshipStatus) ||
          	"NOT_A_CITIZEN".equals(applicant.usCitizenshipStatus));
        then 
-         eligibility_result.schipStatus = "NOT_ELIGIBLE";
-         addElgResultStatusReason(eligibility_result, "NON_CITIZEN");
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+	         schipStatus = "NOT_ELIGIBLE";
+	         addElgResultStatusReason(eligibility_result, "NON_CITIZEN");
+         }
+         //update(eligibility_result);         
          EligibilityUtils.debug("Add Denial Reason of 'citizenship' to Eligibility Result of Applicant " + applicant.firstName);
 
          
@@ -1173,9 +1185,11 @@ rule "DenyOutOfState"
          address: AccountAddressTO();
          eval (!( "GA".equals(address.state)));
        then 
-         eligibility_result.schipStatus = "NOT_ELIGIBLE";
-         addElgResultStatusReason(eligibility_result, "OUT_OF_STATE");
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+	         schipStatus = "NOT_ELIGIBLE";
+	         addElgResultStatusReason(eligibility_result, "OUT_OF_STATE");
+         }
+         //update(eligibility_result);         
          EligibilityUtils.debug("Add Denial Reason of 'OUT_OF_STATE' to Eligibility Result of Applicant " + applicant.firstName);
 end
 
@@ -1191,8 +1205,9 @@ rule "ChipEligibilityDetermination"
          account: AccountTO(accountStatus.equals("COMPLIANT")) from eligibilityInput.account;
          eval (!(account.sentG04i) && ! eligibilityInput.preview);
        then 
-         eligibility_result.schipStatus = "ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	schipStatus = "ELIGIBLE";
+         }   
          EligibilityUtils.debug("Set SCHIP Eligibility Status to 'ELIGIBLE' for Applicant " + applicant.firstName);
 
 end
@@ -1207,8 +1222,9 @@ rule "ChipEligibilityPreview"
          eligibility_result: EligibilityResultTO(person == applicant, statusReasons.isEmpty());
          eval (eligibilityInput.preview);
        then 
-         eligibility_result.schipStatus = "ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	schipStatus = "ELIGIBLE";
+         }         
          EligibilityUtils.debug("SCHIP Eligibility Preview Status to 'ELIGIBLE' for Applicant " + applicant.firstName);
 
 end
@@ -1224,8 +1240,9 @@ rule "ChipPendingInsuranceReferral"
          eligibility_result: EligibilityResultTO(person == applicant, schipStatus.equals("PENDING_ELIGIBILITY"));
          eval (insuranceReferralNotApprovedYet(applicant) && ! eligibilityInput.preview);
        then 
-         addElgResultStatusReason(eligibility_result, "OUTSTANDING_INSURANCE_REFERRAL");
-         update(eligibility_result);         
+       	 
+         addElgResultStatusReason(eligibility_result, "OUTSTANDING_INSURANCE_REFERRAL")
+         update(eligibility_result);   
          EligibilityUtils.debug("SCHIP Eligibility PENDING for 'OUTSTANDING_INSURANCE_REFERRAL' reason on person " + applicant.firstName);
 
          
@@ -1242,8 +1259,9 @@ rule "FianncialMdcdHoldSchip"
          eval ("PENDING_ELIGIBILITY".equals(eligibility_result.mdcdStatus)
          	&& ! ("NOT_ELIGIBLE".equals(eligibility_result.schipStatus)));
        then 
-         eligibility_result.schipStatus = "PENDING_ELIGIBILITY";
-         update (eligibility_result);       
+       	 modify(eligibility_result){
+         	schipStatus = "PENDING_ELIGIBILITY";
+         }    
          EligibilityUtils.debug("Keep SCHIP Pending since child financailly qualifies MDCD on Applicant " + applicant.firstName);
          
          
@@ -1257,10 +1275,11 @@ rule "SetSchipIncomeLimit"
       when 
          applicant: PersonTO(isChild());
          eligibility_result: EligibilityResultTO(person == applicant, incomeLimit == null);
-       then        
-         eligibility_result.incomeLimit = EligibilityUtils.monthlyAmountOnFplPercentage(eligibilityInput.monthlyBaseAmount,
+       then       
+       	 modify(eligibility_result){ 
+         	incomeLimit = EligibilityUtils.monthlyAmountOnFplPercentage(eligibilityInput.monthlyBaseAmount,
          						 eligibilityInput.monthlyPerPersonAmount, eligibility_result.xxiFamilySize, java.lang.Long.valueOf((long) 247 ));
-         update(eligibility_result)
+         }
          EligibilityUtils.debug("Sset income limit based on MAGI household amount for Applicant " + applicant.firstName);
          
 end
@@ -1274,8 +1293,9 @@ rule "DenyMdcdNotApplying"
          applicant: PersonTO(isChild(), applyingForBenefitsFlag == null || ! applyingForBenefitsFlag);
          eligibility_result: EligibilityResultTO(person == applicant);
        then 
-         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	mdcdStatus = "NOT_ELIGIBLE";
+         }         
          EligibilityUtils.debug("Deny MDCD for 'NOT_APPLYING_FOR_BENEFITS' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1291,8 +1311,9 @@ rule "DenyMdcdOnMedicaid"
          eligibility_result: EligibilityResultTO(person == applicant);
          eval (isOnMedicaid(applicant));
        then 
-         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+       	 	mdcdStatus = "NOT_ELIGIBLE";
+         }        
          EligibilityUtils.debug("Deny Mdcd for 'ON_MEDICAID' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1307,8 +1328,9 @@ rule "DenyMdcdOtherInsurance"
          eligibility_result: EligibilityResultTO(person == applicant);
 
        then 
-         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	mdcdStatus = "NOT_ELIGIBLE";
+         }        
          EligibilityUtils.debug("Deny mdcd for 'HAS_OTHER_INSURANCE' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1323,8 +1345,9 @@ rule "DenyMdcdAgeOver19"
          eligibility_result: EligibilityResultTO(person == applicant, age != null);
          eval (eligibility_result.age.longValue() >= 19);
        then 
-         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	mdcdStatus = "NOT_ELIGIBLE";
+         }        
          EligibilityUtils.debug("Deny mdcd for 'OVER_AGE' to Eligibility Result of Applicant " + applicant.firstName);
 
 end
@@ -1339,9 +1362,10 @@ rule "DenyMdcdNotCitizen"
          eligibility_result: EligibilityResultTO(person == applicant);
          eval ("NOT_QUALIFIED_NON_CITIZEN".equals(applicant.usCitizenshipStatus) ||
          	"NOT_A_CITIZEN".equals(applicant.usCitizenshipStatus));
-       then 
-         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
-         update(eligibility_result);         
+       then
+       	 modify(eligibility_result){ 
+         	mdcdStatus = "NOT_ELIGIBLE";
+         }        
          EligibilityUtils.debug("Deny mdcd for 'citizenship' to Eligibility Result of Applicant " + applicant.firstName);
 
          
@@ -1359,8 +1383,9 @@ rule "DenyMdcdOutOfState"
          address: AccountAddressTO();
          eval (!( "GA".equals(address.state)));
        then 
-         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	mdcdStatus = "NOT_ELIGIBLE";
+         }       
          EligibilityUtils.debug("Deny mdcd for 'OUT_OF_STATE' to Eligibility Result of Applicant " + applicant.firstName);
 end
 
@@ -1375,8 +1400,9 @@ rule "DenyNotCompliantAccountMember"
          account: AccountTO(!("COMPLIANT".equals(accountStatus))) from eligibilityInput.account;
 
        then 
-         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	mdcdStatus = "NOT_ELIGIBLE";
+         }         
          EligibilityUtils.debug("Deny mdcd for account is not compliant to Eligibility Result of Applicant " + applicant.firstName);
 end
 
@@ -1389,8 +1415,9 @@ rule "DenyNotVerifiedMember"
          applicant: PersonTO(isChild(), !("MEMBER_VERIFIED".equals(status)));
          eligibility_result: EligibilityResultTO(person == applicant);
        then 
-         eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
-         update(eligibility_result);         
+       	 modify(eligibility_result){
+         	mdcdStatus = "NOT_ELIGIBLE";
+         }     
          EligibilityUtils.debug("Deny mdcd for member is not verified yet to Eligibility Result of Applicant " + applicant.firstName);
 end
 
