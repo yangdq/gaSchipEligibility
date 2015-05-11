@@ -1012,8 +1012,7 @@ rule "SubtractHouseholdDeduction"
          counted_expense: ExpenseTO() from magi_household.expenses;
        then 
          
-         magi_household.subtractHouseholdIncome(expenseMonthlyAmount(counted_expense));
-      
+         magi_household.subtractHouseholdIncome(expenseMonthlyAmount(counted_expense));      
          EligibilityUtils.debug("Subtract " + expenseMonthlyAmount(counted_expense) + " from household of "
           + per.firstName + " to income total " + magi_household.householdIncome);
 
