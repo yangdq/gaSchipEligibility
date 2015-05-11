@@ -230,11 +230,6 @@ function EligibilityResultTO createElgResult(PersonTO applicant){
 	elgResult.setAccountRelationshipId(applicant.getAccountRelationshipId());
 	elgResult.setMemberStatus(applicant.getStatus());
 	elgResult.setPerson(applicant);
-	// temp place holder for age
-	//elgResult.setAge(1000L);
-	elgResult.setXxiFamilySize(0L);
-	elgResult.setXxiIncome(0.0d);
-	elgResult.setFivePctDeductedIncome(0.0d);
 	return elgResult;
 }
 
@@ -396,9 +391,8 @@ rule "calculateApplicantAge"
         applicant: com.psi.vida.business.to.PersonTO(isChild(), dateOfBirth != null)
         eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
     then
-    	//modify(eligibility_result){
-   			eligibility_result.setAge(java.lang.Long.valueOf((long)(com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth)))); 		
-    	//}
+    	// No modify statement to avoid triggering rules in SCHIP/Mediciad table.  Wait until the xxiIncome are set in downstream rules
+   		eligibility_result.setAge(java.lang.Long.valueOf((long)(com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth)))); 		
         EligibilityUtils.debug("Calculate applicant age for Eligibility Result of Applicant " + applicant.firstName + " to " + com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth));
 
 end
@@ -1044,17 +1038,18 @@ rule "InitializeEligibilityResult1"
          eval (magi_household.householdIncome.doubleValue() >= 0.0d);
          
        then 
-
-	   		 eligibility_result.setXxiFamilySize((long)magi_household.householdSize);
-	         eligibility_result.setXixFamilySize((long)magi_household.householdSize);
-	         eligibility_result.setXixIncome(magi_household.householdIncome);
-	         eligibility_result.setXxiIncome(magi_household.householdIncome);
-	         double deductedIncome = magi_household.householdIncome.doubleValue() - magi_household.fivePctDeduction.doubleValue();
-	         eligibility_result.setFivePctDeductedIncome(new Double(deductedIncome));
-	         eligibility_result.setXxiFamilyFpl(EligibilityUtils.fplMonthlyValue(eligibilityInput.monthlyBaseAmount, eligibilityInput.monthlyPerPersonAmount, (long) magi_household.householdSize));
-	         eligibility_result.setXixFamilyFpl(EligibilityUtils.fplMonthlyValue(eligibilityInput.monthlyBaseAmount, eligibilityInput.monthlyPerPersonAmount, (long) magi_household.householdSize ));
-
- 		update(eligibility_result);
+       		double deductedIncome = magi_household.householdIncome.doubleValue() - magi_household.fivePctDeduction.doubleValue();
+			modify(eligibility_result){
+		   		 setXxiFamilySize((long)magi_household.householdSize),
+		         setXixFamilySize((long)magi_household.householdSize),
+		         setXixIncome(magi_household.householdIncome),
+		         setXxiIncome(magi_household.householdIncome),
+		         	         
+		         setFivePctDeductedIncome(new Double(deductedIncome)),
+		         setXxiFamilyFpl(EligibilityUtils.fplMonthlyValue(eligibilityInput.monthlyBaseAmount, eligibilityInput.monthlyPerPersonAmount, (long) magi_household.householdSize)),
+		         setXixFamilyFpl(EligibilityUtils.fplMonthlyValue(eligibilityInput.monthlyBaseAmount, eligibilityInput.monthlyPerPersonAmount, (long) magi_household.householdSize ))
+			}
+ 		
                  
          EligibilityUtils.debug("Set Eligibility Result family size and household size to: " + magi_household.householdSize + 
          	" and income of 'eligibility result' to: " + magi_household.householdIncome.doubleValue() +
