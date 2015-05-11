@@ -886,7 +886,7 @@ rule "FilterHouseholdDeduction"
             	(household_member.isChild() && 
             	   (thresholdAnnualIncomeOfType(IncomeTypeEnum.EARNED, household_member) > 6200.0d
          	        || thresholdAnnualIncomeOfType(IncomeTypeEnum.UNEARNED, household_member) > 1000.0d)
-         	&& (magi_household.householdType.equals(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD)
+         	&& (MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(magi_household.householdType)
          	       && ageForDetermination(household_member) < 19)
          	|| (isNullSafeTrue(household_member.taxDependentFlag)
          	        && (magi_household.householdType == MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1 ||
@@ -917,7 +917,7 @@ rule "FilterHouseholdIncome"
             	(household_member.isChild() && 
             	   (thresholdAnnualIncomeOfType(IncomeTypeEnum.EARNED, household_member) > 6200.0d
          	        || thresholdAnnualIncomeOfType(IncomeTypeEnum.UNEARNED, household_member) > 1000.0d)
-         	&& (magi_household.householdType.equals(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD)
+         	&& (MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(magi_household.householdType)
          	       && ageForDetermination(household_member) < 19)
          	|| (isNullSafeTrue(household_member.taxDependentFlag)
          	        && (magi_household.householdType == MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1 ||
@@ -949,7 +949,7 @@ rule "FilterHouseholdIncomePreviewOnly"
             	(household_member.isChild() && 
             	   (thresholdAnnualIncomeOfType(IncomeTypeEnum.EARNED, household_member) > 6200.0d
          	        || thresholdAnnualIncomeOfType(IncomeTypeEnum.UNEARNED, household_member) > 1000.0d)
-         	&& (magi_household.householdType.equals(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD)
+         	&& (MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(magi_household.householdType)
          	       && ageForDetermination(household_member) < 19)
          	|| (isNullSafeTrue(household_member.taxDependentFlag)
          	        && (magi_household.householdType == MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1 ||
