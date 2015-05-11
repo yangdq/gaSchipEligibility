@@ -182,25 +182,6 @@ rule "insertOriginalPremiums"
 end
 
 
-/*
-rule "countEligibleChildren"
-	ruleflow-group "premiumInitialSetUp"
-	salience 100
-	no-loop true
-	
-    when
-        applicant: com.psi.vida.business.to.PersonTO(isChild())
-        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), schipStatus.equals("ELIGIBLE"))
-        eval(DateUtil.ageOnDate(applicant.getDateOfBirth(), specifiedDate) >= 6 &&
-            (applicant.getTribalMemberVerifiedFlag() == null || applicant.getTribalMemberVerifiedFlag() == false) &&
-            EligibilityUtils.isNotFosterChild(applicant))
-    then
-		totalEligibleChildren ++;
-		update(totalEligibleChildren);
-        EligibilityUtils.debug("Increase total eligible children count by 1 to " + totalEligibleChildren);
-	    
-end
-*/
 
 rule "detectAgeTurn6Reason"
 	ruleflow-group "premiumInitialSetUp"
@@ -225,17 +206,15 @@ rule "findLowestFPLPercentage"
 	no-loop true
 	
     when
-         child: PersonTO(isNotFosterChild(this))
          interium: DroolsInternal();
-         eligibility_result: EligibilityResultTO( EligibilityStatusEnum.ELIGIBLE.getValue().equals(schipStatus), child.equals(person),
-         											xxiIncome != null)
+         accumulate(eligibility_result: EligibilityResultTO( EligibilityStatusEnum.ELIGIBLE.getValue().equals(schipStatus), isNotFosterChild(person),
+         											xxiIncome != null); $minFPL: min(eligibility_result.getXxiIncome().doubleValue() * 100 / eligibility_result.getXxiFamilyFpl().doubleValue()))
 
-         eval((eligibility_result.getXxiIncome().doubleValue() * 100 / eligibility_result.getXxiFamilyFpl().doubleValue()) 
-         	< interium.getLowestFPLPct())
     then
-         interium.setLowestFPLPct((int)(eligibility_result.getXxiIncome() * 100 / eligibility_result.getXxiFamilyFpl()));
-		 update (interium);
-         EligibilityUtils.debug("Decrease the lowest FPL pecentage to XIX value of " + interium.getLowestFPLPct());
+    	 modify(interium){
+         	setLowestFPLPct((int) $minFPL.doubleValue());
+         }
+         EligibilityUtils.debug("Identify the lowest FPL pecentage to XIX value of " + interium.getLowestFPLPct());
 	    
 end
 
