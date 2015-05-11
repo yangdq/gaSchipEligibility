@@ -319,7 +319,7 @@ end
 rule "insertPerson"
 	ruleflow-group "eligibilityInitialSetup"
 	salience 10000
-	no-loop true
+	no-loop
 	
     when
         person: PersonTO(! MemberStatusEnum.DECEASED.toString().equals(status) 
@@ -333,7 +333,7 @@ end
 rule "insertHomeAddress"
 	ruleflow-group "eligibilityInitialSetup"
 	salience 10000
-	no-loop true
+	no-loop
 	
     when
         address: AccountAddressTO(AddressTypeEnum.HOMEADDRESS.toString().equals(addressType)) from eligibilityOutput.account.accountAddresses
@@ -346,7 +346,7 @@ end
 rule "insertFamilyRelationships"
 	ruleflow-group "eligibilityInitialSetup"
 	salience 5000
-	no-loop true
+	no-loop
 	
     when
     	person: PersonTO()
@@ -360,7 +360,7 @@ end
 rule "insertTaxRealtionships"
 	ruleflow-group "eligibilityInitialSetup"
 	salience 5000
-	no-loop true
+	no-loop
 	
     when
     	person: PersonTO()
@@ -373,7 +373,7 @@ end
 rule "insertApplicantHouseholdResult"
 	ruleflow-group "eligibilityInitialSetup"
 	salience 5000
-	no-loop true
+	no-loop
 	
     when
     	applicant: PersonTO(isChild(), dateOfBirth != null, applyingForBenefitsFlag == null || applyingForBenefitsFlag)
@@ -390,7 +390,7 @@ end
 rule "calculateApplicantAge"
 	ruleflow-group "eligibilityInitialSetup"
 	salience 100
-	no-loop true
+	no-loop
 	
     when
         applicant: com.psi.vida.business.to.PersonTO(isChild(), dateOfBirth != null)
@@ -406,7 +406,7 @@ end
 rule "scanForVerifiedIncome"
 	ruleflow-group "eligibilityInitialSetup"
 	salience 100
-	no-loop true
+	no-loop
 	
       when 
       	internalData1: DroolsInternal();
@@ -414,8 +414,9 @@ rule "scanForVerifiedIncome"
          exists IncomeTO("VERIFIED".equals(verficationStatus), !("SUPPLEMENTAL_SECURITY_INCOME".equals(incomeSubtype)) )  from person.incomes;
 
        then 
-         internalData1.familyHasVerfieidIncome = true;
-         update(internalData1);
+         modify(internalData1){
+         	familyHasVerfieidIncome = true;
+         }
          EligibilityUtils.debug("Family has verified incomes.  Eligibility preview should use verified incomes only");
       
 end
@@ -423,7 +424,7 @@ end
 rule "taxFilerException1"
 	ruleflow-group "taxFilerException"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          house_hold: com.psi.vida.util.rules.MAGIHousehold()
@@ -444,7 +445,7 @@ end
 rule "taxFilerException2"
 	ruleflow-group "taxFilerException"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          house_hold: MAGIHousehold();
@@ -467,7 +468,7 @@ end
 rule "taxFilerException3"
 	ruleflow-group "taxFilerException"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          house_hold: MAGIHousehold();
@@ -488,7 +489,7 @@ end
 rule "magiHouseholdType_0"
 	ruleflow-group "magiHouseholdType"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: MAGIHousehold();
@@ -496,8 +497,9 @@ rule "magiHouseholdType_0"
          eval (isNullSafeTrue(applicant.taxFilerFlag)  && ! isNullSafeTrue(applicant.taxDependentFlag));
 
        then 
-         magi_household.householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1;
-         update(magi_household);
+       	 modify(magi_household){
+         	householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1;
+         }
          EligibilityUtils.debug("MAGI Household Type is TAX_HOUSEHOLD1");
       
 end
@@ -505,7 +507,7 @@ end
 rule "magiHouseholdType_1"
 	ruleflow-group "magiHouseholdType"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: MAGIHousehold();
@@ -514,8 +516,9 @@ rule "magiHouseholdType_1"
 
 
        then 
-         magi_household.householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2;
-         update(magi_household);
+       	 modify(magi_household){
+         	householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2;
+         }
          EligibilityUtils.debug("MAGI Household Type is TAX_HOUSEHOLD2");
       
 end
@@ -523,7 +526,7 @@ end
 rule "magiHouseholdType_2"
 	ruleflow-group "magiHouseholdType"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: MAGIHousehold();
@@ -531,8 +534,9 @@ rule "magiHouseholdType_2"
         eval (isNullSafeTrue(applicant.taxFilerFlag) && isNullSafeTrue(applicant.taxDependentFlag) && magi_household.taxDependentException);
 
        then 
-         magi_household.householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
-         update(magi_household);
+       	 modify(magi_household){
+         	householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
+         }
          EligibilityUtils.debug("MAGI Household Type is Medicaid_HOUSEHOLD");
       
 end
@@ -540,7 +544,7 @@ end
 rule "magiHouseholdType_3"
 	ruleflow-group "magiHouseholdType"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: MAGIHousehold();
@@ -549,8 +553,9 @@ rule "magiHouseholdType_3"
 
 
        then 
-         magi_household.householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
-         update(magi_household);
+       	 modify(magi_household){
+         	householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
+         }
          EligibilityUtils.debug("MAGI Household Type is Medicaid_HOUSEHOLD");
       
 end
@@ -558,7 +563,7 @@ end
 rule "magiHouseholdType_4"
 	ruleflow-group "magiHouseholdType"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: MAGIHousehold();
@@ -567,8 +572,9 @@ rule "magiHouseholdType_4"
 
 
        then 
-         magi_household.householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2;
-         update(magi_household);
+       	 modify(magi_household){
+         	householdType = MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2;
+         }
          EligibilityUtils.debug("MAGI Household Type is TAX_HOUSEHOLD2");
       
 end
@@ -576,7 +582,7 @@ end
 rule "magiHouseholdType_5"
 	ruleflow-group "magiHouseholdType"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: MAGIHousehold();
@@ -585,8 +591,9 @@ rule "magiHouseholdType_5"
 
 
        then 
-         magi_household.householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
-         update(magi_household);
+       	 modify(magi_household){
+         	householdType = MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD;
+         }
          EligibilityUtils.debug("MAGI Household Type is Medicaid_HOUSEHOLD");
       
 end
@@ -594,7 +601,7 @@ end
 rule "nonFiler_addChildren"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
@@ -607,9 +614,9 @@ rule "nonFiler_addChildren"
          	&& DateUtil.currentAge(child.dateOfBirth) < 19);
          	
        then 
-         
-         magi_household.addMember(child);
-         update (magi_household);          
+         modify(magi_household){
+         	addMember(child);
+         }         
          EligibilityUtils.debug("Add tax dependent " + child.firstName + " to MEDICAID_HOUSEHOLD of tax dependent " + person.firstName);
          
       
@@ -618,7 +625,7 @@ end
 rule "nonFiler_addGrandChildrenSiblings"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
@@ -636,9 +643,9 @@ rule "nonFiler_addGrandChildrenSiblings"
 
 
        then 
-         
-         magi_household.addMember(sibling);
-         update (magi_household);     
+         modify(magi_household){
+         	addMember(sibling);
+         } 
          EligibilityUtils.debug("Add sibling " + sibling.firstName + " to MEDICAID_HOUSEHOLD of child " + grandchild1.firstName);
 
       
@@ -647,7 +654,7 @@ end
 rule "nonFiler_addParents"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
@@ -661,8 +668,9 @@ rule "nonFiler_addParents"
 
 
        then 
-         magi_household.addMember(non_tax_filer_parent);
-         update(magi_household);         
+       	 modify(magi_household){
+         	addMember(non_tax_filer_parent);  
+         }      
          EligibilityUtils.debug("Add non tax filer parent " + non_tax_filer_parent.firstName + " to MEDICAID_HOUSEHOLD of child " + child.firstName);
 
       
@@ -671,7 +679,7 @@ end
 rule "nonFiler_addSiblings"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
@@ -688,9 +696,9 @@ rule "nonFiler_addSiblings"
          	&& DateUtil.currentAge(sibling.dateOfBirth) < 19);
 
        then 
-         
-         magi_household.addMember(sibling);
-         update (magi_household);     
+         modify(magi_household){
+         	addMember(sibling);  
+         }   
          EligibilityUtils.debug("Add sibling " + sibling.firstName + " to MEDICAID_HOUSEHOLD of child " + child1.firstName);
 
       
@@ -699,7 +707,7 @@ end
 rule "nonFiler_addSpouseLivingTogether"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.MEDICAID_HOUSEHOLD.equals(householdType));
@@ -713,9 +721,9 @@ rule "nonFiler_addSpouseLivingTogether"
          	&& liveInTheFamily(person)
          	&& liveInTheFamily(spouse) );
        then 
-         
-         magi_household.addMember(spouse);
-         update (magi_household);    
+         modify(magi_household){
+         	addMember(spouse);   
+         } 
          EligibilityUtils.debug("Add spouse " + spouse.firstName + " to MEDICAID_HOUSEHOLD of person " + person.firstName);
       
 end
@@ -723,7 +731,7 @@ end
 rule "taxFiler1_addSpouseLivingTogether"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1.equals(householdType));
@@ -737,9 +745,9 @@ rule "taxFiler1_addSpouseLivingTogether"
          	&& liveInTheFamily(spouse) );
 
        then 
-         
-         magi_household.addMember(spouse);
-         update (magi_household);   
+         modify(magi_household){
+         	addMember(spouse);   
+         }
          EligibilityUtils.debug("Add spouse " + spouse.firstName + " to TAX_HOUSEHOLD1 of tax filer " + tax_filer.firstName);
 
       
@@ -748,7 +756,7 @@ end
 rule "taxFiler1_addTaxDependent"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD1.equals(householdType));
@@ -757,9 +765,9 @@ rule "taxFiler1_addTaxDependent"
          TaxRelationshipTO(toPersonTO == tax_filer) from tax_dependent.taxRelationships;
 
        then 
-         
-         magi_household.addMember(tax_dependent);
-         update (magi_household);
+         modify(magi_household){
+         	addMember(tax_dependent);
+         }
          EligibilityUtils.debug("Add tax dependent " + tax_dependent.firstName + " to TAX_HOUSEHOLD1 of tax filer " + tax_filer.firstName);
 
       
@@ -768,7 +776,7 @@ end
 rule "taxFiler2_addTaxDependent"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2.equals(householdType));
@@ -779,9 +787,9 @@ rule "taxFiler2_addTaxDependent"
          tax_relationship_2: TaxRelationshipTO(toPersonTO == tax_filer) from tax_dependent2.taxRelationships;
 
        then 
-         
-         magi_household.addMember(tax_dependent2);
-         update (magi_household);      
+         modify(magi_household){
+         	addMember(tax_dependent2);      
+         }
          EligibilityUtils.debug("Add tax dependent " + tax_dependent2.firstName + " to TAX_HOUSEHOLD2 of tax dependent " + tax_dependent1.firstName);
 
       
@@ -790,7 +798,7 @@ end
 rule "taxFiler2_addTaxFiler"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2.equals(householdType));
@@ -799,9 +807,9 @@ rule "taxFiler2_addTaxFiler"
          TaxRelationshipTO(toPersonTO == tax_filer) from tax_dependent.taxRelationships;
 
        then 
-         
-         magi_household.addMember(tax_filer);
-         update (magi_household);      
+         modify(magi_household){
+         	addMember(tax_filer);     
+         }
          EligibilityUtils.debug("Add tax filer " + tax_filer.firstName  + " to TAX_HOUSEHOLD2 of tax filer " + tax_dependent.firstName);
 
       
@@ -810,7 +818,7 @@ end
 rule "taxFiler2_addTaxFilerSpouseLivingTogether"
 	ruleflow-group "magiHouseholdSetup"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold(MAGIHouseholdTypeEnum.TAX_HOUSEHOLD2.equals(householdType));
@@ -824,54 +832,49 @@ rule "taxFiler2_addTaxFilerSpouseLivingTogether"
          	&& liveInTheFamily(tax_filer)
          	&& liveInTheFamily(tax_filer_spouse));
        then 
-         
-         magi_household.addMember(tax_filer_spouse);
-         update (magi_household);       
+         modify(magi_household){
+         	addMember(tax_filer_spouse);   
+         }    
          EligibilityUtils.debug("Add tax Add tax filer spouse living together " + tax_filer_spouse.firstName + " to TAX_HOUSEHOLD2 of tax dependent " + tax_dependent.firstName);
 
       
-end
-
-rule "CalculateHouseholdIncome"
-	ruleflow-group "magiCalculation"
-	salience 5000
-	no-loop true
-	
-      when 
-         person: com.psi.vida.business.to.PersonTO();
-         magi_household: MAGIHousehold(person == person);
-         counted_income: IncomeTO() from magi_household.incomes;
-       then 
-         magi_household.addHouseholdIncome(incomeMonthlyAmount(counted_income));
-         update(magi_household);       
-         EligibilityUtils.debug("Add " + incomeMonthlyAmount(counted_income) + " to household of " + person.firstName + " to income total " + magi_household.householdIncome);
-
-
-
 end
 
 
 rule "CountHouseholdSize"
 	ruleflow-group "magiCalculation"
 	salience 10000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold();
          household_member: PersonTO() from magi_household.members;
          eval (household_member.pregnant != null && household_member.pregnant);
        then 
-         magi_household.addPregnantCount(effectiveHouseholdCount(determinationDate, household_member) - 1);
-         update(magi_household);        
+         magi_household.addPregnantCount(effectiveHouseholdCount(determinationDate, household_member) - 1);      
          EligibilityUtils.debug("Add extra household headcount of  " + (effectiveHouseholdCount(determinationDate, household_member) - 1) + 
          " to household of " + household_member.firstName + " due to pregnancy");
+
+end
+
+rule "FivePercentDeduction"
+	ruleflow-group "magiCalculation"
+	salience 9000
+	no-loop
+	
+      when 
+         magi_household: MAGIHousehold();
+       then 
+         
+         magi_household.setFivePctDeduction(Math.ceil(0.05d * EligibilityUtils.monthlyAmountOnFplPercentage(eligibilityInput.getMonthlyBaseAmount(), eligibilityInput.getMonthlyPerPersonAmount(), (long)magi_household.householdSize, 100L)));   
+         EligibilityUtils.debug("Calculate MAGI 5% Deduction");
 
 end
 
 rule "FilterHouseholdDeduction"
 	ruleflow-group "magiCalculation"
 	salience 10000
-	no-loop true
+	no-loop
 	
       when 
          magi_household: MAGIHousehold();
@@ -892,8 +895,9 @@ rule "FilterHouseholdDeduction"
          	  )) && ! magi_household.expenses.contains(member_deduction)
             );
        then 
-         magi_household.addExpense(member_deduction);
-         update (magi_household);       
+       	 modify(magi_household){
+         	addExpense(member_deduction); 
+         }    
          EligibilityUtils.debug("Add expense of type  " + member_deduction.expenseType + " to household of " + magi_household.person.firstName);
 
 end
@@ -901,7 +905,7 @@ end
 rule "FilterHouseholdIncome"
 	ruleflow-group "magiCalculation"
 	salience 10000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: rules.MAGIHousehold();
@@ -922,9 +926,9 @@ rule "FilterHouseholdIncome"
          	  )) && ! magi_household.incomes.contains(member_income)
             );
        then 
-         
-         magi_household.addIncome(member_income);
-         update (magi_household); 
+         modify(magi_household){
+        	addIncome(member_income);
+         }
          EligibilityUtils.debug("Add income of type " + member_income.incomeSubtype + " to household of " + magi_household.person.firstName);
 
 end
@@ -932,7 +936,7 @@ end
 rule "FilterHouseholdIncomePreviewOnly"
 	ruleflow-group "magiCalculation"
 	salience 10000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: rules.MAGIHousehold();
@@ -955,32 +959,51 @@ rule "FilterHouseholdIncomePreviewOnly"
             );
 
        then 
-         
-         magi_household.addIncome(member_income);
-         update (magi_household);    
-         EligibilityUtils.debug("Add income of type " + member_income.incomeSubtype + " to household of " + magi_household.person.firstName);
+         modify(magi_household){
+         	addIncome(member_income); 
+         }   
+         EligibilityUtils.debug("Preview Add income of type " + member_income.incomeSubtype + " to household of " + magi_household.person.firstName);
 
 end
 
-rule "FivePercentDeduction"
+/*
+rule "CalculateHouseholdIncome"
 	ruleflow-group "magiCalculation"
-	salience 1000
-	no-loop true
+	salience 5000
+	no-loop
 	
       when 
-         magi_household: MAGIHousehold();
-       then 
+         person: PersonTO();
+         magi_household: MAGIHousehold(person == person, householdIncome == 0.0d);
+         accumulate(counted_income: IncomeTO() from magi_household.incomes;  $sum : sum(incomeMonthlyAmount(counted_income)));
          
-         magi_household.setFivePctDeduction(Math.ceil(0.05d * EligibilityUtils.monthlyAmountOnFplPercentage(eligibilityInput.getMonthlyBaseAmount(), eligibilityInput.getMonthlyPerPersonAmount(), (long)magi_household.householdSize, 100L)));
-         update (magi_household);   
-         EligibilityUtils.debug("Calculate MAGI 5% Deduction");
+       then 
+         magi_household.addHouseholdIncome($sum);     
+         EligibilityUtils.debug("Add " + magi_household.householdIncome + " to household of " + person.firstName + " to income total " + magi_household.householdIncome);
+
+end*/
+
+rule "CalculateHouseholdIncome"
+	ruleflow-group "magiCalculation"
+	salience 5000
+	no-loop
+	
+      when 
+         person: com.psi.vida.business.to.PersonTO();
+         magi_household: MAGIHousehold(person == person);
+         counted_income: IncomeTO() from magi_household.incomes;
+       then 
+         magi_household.addHouseholdIncome(incomeMonthlyAmount(counted_income));     
+         EligibilityUtils.debug("Add " + incomeMonthlyAmount(counted_income) + " to household of " + person.firstName + " to income total " + magi_household.householdIncome);
 
 end
+
+
 
 rule "SubtractHouseholdDeduction"
 	ruleflow-group "magiCalculation"
 	salience 3000
-	no-loop true
+	no-loop
 	
       when 
         per: PersonTO();
@@ -989,7 +1012,7 @@ rule "SubtractHouseholdDeduction"
        then 
          
          magi_household.subtractHouseholdIncome(expenseMonthlyAmount(counted_expense));
-         update (magi_household);       
+         //update (magi_household);       
          EligibilityUtils.debug("Subtract " + expenseMonthlyAmount(counted_expense) + " from household of "
           + per.firstName + " to income total " + magi_household.householdIncome);
 
@@ -999,7 +1022,7 @@ end
 rule "MAGIHouseholdSummary"
 	ruleflow-group "initializeResults"
 	salience 10000
-	no-loop true
+	no-loop
 	
       when 
  			magi_household: MAGIHousehold();
@@ -1012,7 +1035,7 @@ end
 rule "InitializeEligibilityResult1"
 	ruleflow-group "initializeResults"
 	salience 10000
-	no-loop true
+	no-loop
 	
       when 
         magi_household: MAGIHousehold();
@@ -1043,7 +1066,7 @@ end
 rule "DenyChildNotApplying"
 	ruleflow-group "chipDetermination"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), applyingForBenefitsFlag == null || ! applyingForBenefitsFlag);
@@ -1059,7 +1082,7 @@ end
 rule "DenyInsuranceReferral"
 	ruleflow-group "chipDetermination"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1076,7 +1099,7 @@ end
 rule "DenyOnMedicaid"
 	ruleflow-group "chipDetermination"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1093,7 +1116,7 @@ end
 rule "DenyOtherInsurance"
 	ruleflow-group "chipDetermination"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), hasInsuranceFlag != null && hasInsuranceFlag);
@@ -1110,7 +1133,7 @@ end
 rule "DenyAgeOver19"
 	ruleflow-group "chipDetermination"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1127,7 +1150,7 @@ end
 rule "DenyNotCitizen"
 	ruleflow-group "chipDetermination"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), usCitizenshipVerifiedFlag != null && usCitizenshipVerifiedFlag);
@@ -1147,7 +1170,7 @@ end
 rule "DenyOutOfState"
 	ruleflow-group "chipDetermination"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1165,7 +1188,7 @@ end
 rule "ChipEligibilityDetermination"
 	ruleflow-group "processChipResults"
 	salience 3000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), status.equals("MEMBER_VERIFIED"));
@@ -1182,7 +1205,7 @@ end
 rule "ChipEligibilityPreview"
 	ruleflow-group "processChipResults"
 	salience 3000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1199,7 +1222,7 @@ end
 rule "ChipPendingInsuranceReferral"
 	ruleflow-group "processChipResults"
 	salience 5000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), isNullSafeTrue(memberLostInsuranceFlag));
@@ -1216,7 +1239,7 @@ end
 rule "FianncialMdcdHoldSchip"
 	ruleflow-group "processChipResults"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1234,11 +1257,11 @@ end
 rule "SetSchipIncomeLimit"
 	ruleflow-group "processChipResults"
 	salience 3000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
-         eligibility_result: EligibilityResultTO(person == applicant);
+         eligibility_result: EligibilityResultTO(person == applicant, incomeLimit == null);
        then        
          eligibility_result.incomeLimit = EligibilityUtils.monthlyAmountOnFplPercentage(eligibilityInput.monthlyBaseAmount,
          						 eligibilityInput.monthlyPerPersonAmount, eligibility_result.xxiFamilySize, java.lang.Long.valueOf((long) 247 ));
@@ -1250,7 +1273,7 @@ end
 rule "DenyMdcdNotApplying"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), applyingForBenefitsFlag == null || ! applyingForBenefitsFlag);
@@ -1266,7 +1289,7 @@ end
 rule "DenyMdcdOnMedicaid"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1282,7 +1305,7 @@ end
 rule "DenyMdcdOtherInsurance"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), hasInsuranceFlag != null && hasInsuranceFlag);
@@ -1298,7 +1321,7 @@ end
 rule "DenyMdcdAgeOver19"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1314,7 +1337,7 @@ end
 rule "DenyMdcdNotCitizen"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), usCitizenshipVerifiedFlag != null && usCitizenshipVerifiedFlag);
@@ -1333,7 +1356,7 @@ end
 rule "DenyMdcdOutOfState"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1349,7 +1372,7 @@ end
 rule "DenyNotCompliantAccountMember"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
@@ -1365,7 +1388,7 @@ end
 rule "DenyNotVerifiedMember"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild(), !("MEMBER_VERIFIED".equals(status)));
@@ -1379,7 +1402,7 @@ end
 rule "PendingForMdcdReferral"
 	ruleflow-group "nonFinancialMdcd"
 	salience 100
-	no-loop true
+	no-loop
 	
       when 
          applicant: PersonTO(isChild());
