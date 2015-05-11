@@ -24,6 +24,7 @@ import com.psi.vida.business.to.EligibilityResultTO;
 import com.psi.vida.business.to.PersonTO;
 import com.psi.vida.business.vo.EligibilityInput;
 import com.psi.vida.concept.ruleservice.util.RuleSetOOCTestDataUtil;
+import com.psi.vida.generatedenums.ListOfValuesUtil.AccountStatusEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.EarnedIncomeSubtypeEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.EligibilityStatusEnum;
 import com.psi.vida.generatedenums.ListOfValuesUtil.ExpenseEnum;
@@ -51,6 +52,17 @@ public class AwEligibilityTestOOC extends AwVidaRuleEngineBaseTestCase{
     	input.setMonthlyBaseAmount(new BigDecimal(634.17d));
     	input.setMonthlyPerPersonAmount(new BigDecimal(346.67d));
     }
+    
+    @Test
+    public void testNoFinancialReady() throws Exception {
+    	account.setAccountStatus(AccountStatusEnum.PENDINGCOMPLIANCE.getValue());
+    	List<EligibilityResultTO> results = super.determineEligibility(input).getResults();
+    	Assert.assertEquals("One Result is Created", 1, results.size());
+    	EligibilityResultTO result = results.get(0);
+    	System.out.println(result.getXxiIncome());
+    	Assert.assertEquals(EligibilityStatusEnum.PENDINGELIGIBILITY.getValue(), result.getSchipStatus());
+    	Assert.assertEquals("No Status Reason is associated to the result", 0, result.getStatusReasons().size());
+    }    
     
     @Test
     public void testIncomeCalculation() throws Exception {
