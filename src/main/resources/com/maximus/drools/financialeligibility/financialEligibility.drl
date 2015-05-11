@@ -231,7 +231,7 @@ function EligibilityResultTO createElgResult(PersonTO applicant){
 	elgResult.setMemberStatus(applicant.getStatus());
 	elgResult.setPerson(applicant);
 	// temp place holder for age
-	elgResult.setAge(1000L);
+	//elgResult.setAge(1000L);
 	elgResult.setXxiFamilySize(0L);
 	elgResult.setXxiIncome(0.0d);
 	elgResult.setFivePctDeductedIncome(0.0d);
@@ -394,11 +394,11 @@ rule "calculateApplicantAge"
 	
     when
         applicant: com.psi.vida.business.to.PersonTO(isChild(), dateOfBirth != null)
-        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant), age == 1000)
+        eligibility_result: com.psi.vida.business.to.EligibilityResultTO(person.equals(applicant))
     then
-    	modify(eligibility_result){
-   			setAge(java.lang.Long.valueOf((long)(com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth)))); 		
-    	}
+    	//modify(eligibility_result){
+   			eligibility_result.setAge(java.lang.Long.valueOf((long)(com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth)))); 		
+    	//}
         EligibilityUtils.debug("Calculate applicant age for Eligibility Result of Applicant " + applicant.firstName + " to " + com.psi.vida.util.rules.DateUtil.currentAge(applicant.dateOfBirth));
 
 end
@@ -1137,7 +1137,7 @@ rule "DenyAgeOver19"
 	
       when 
          applicant: PersonTO(isChild());
-         eligibility_result: EligibilityResultTO(person == applicant);
+         eligibility_result: EligibilityResultTO(person == applicant, age != null);
          eval (eligibility_result.age.longValue() >= 19);
        then 
          eligibility_result.schipStatus = "NOT_ELIGIBLE";
@@ -1325,7 +1325,7 @@ rule "DenyMdcdAgeOver19"
 	
       when 
          applicant: PersonTO(isChild());
-         eligibility_result: EligibilityResultTO(person == applicant);
+         eligibility_result: EligibilityResultTO(person == applicant, age != null);
          eval (eligibility_result.age.longValue() >= 19);
        then 
          eligibility_result.mdcdStatus = "NOT_ELIGIBLE";
