@@ -966,7 +966,7 @@ rule "FilterHouseholdIncomePreviewOnly"
 
 end
 
-/*
+
 rule "CalculateHouseholdIncome"
 	ruleflow-group "magiCalculation"
 	salience 5000
@@ -978,11 +978,12 @@ rule "CalculateHouseholdIncome"
          accumulate(counted_income: IncomeTO() from magi_household.incomes;  $sum : sum(incomeMonthlyAmount(counted_income)));
          
        then 
-         magi_household.addHouseholdIncome($sum);     
-         EligibilityUtils.debug("Add " + magi_household.householdIncome + " to household of " + person.firstName + " to income total " + magi_household.householdIncome);
+         magi_household.addHouseholdIncome($sum);   
+         EligibilityUtils.debug("Accumulate " + magi_household.householdIncome + " to household of " + person.firstName + " to income total " + magi_household.householdIncome);
 
-end*/
+end
 
+/*
 rule "CalculateHouseholdIncome"
 	ruleflow-group "magiCalculation"
 	salience 5000
@@ -997,7 +998,7 @@ rule "CalculateHouseholdIncome"
          EligibilityUtils.debug("Add " + incomeMonthlyAmount(counted_income) + " to household of " + person.firstName + " to income total " + magi_household.householdIncome);
 
 end
-
+*/
 
 
 rule "SubtractHouseholdDeduction"
@@ -1012,7 +1013,7 @@ rule "SubtractHouseholdDeduction"
        then 
          
          magi_household.subtractHouseholdIncome(expenseMonthlyAmount(counted_expense));
-         //update (magi_household);       
+      
          EligibilityUtils.debug("Subtract " + expenseMonthlyAmount(counted_expense) + " from household of "
           + per.firstName + " to income total " + magi_household.householdIncome);
 
