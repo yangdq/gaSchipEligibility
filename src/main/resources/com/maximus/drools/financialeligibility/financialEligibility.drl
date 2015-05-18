@@ -1284,6 +1284,22 @@ rule "SetSchipIncomeLimit"
          
 end
 
+rule "FivePctDeductionAmount"
+	ruleflow-group "processChipResults"
+	salience 3000
+	no-loop
+	
+      when 
+         magi_household: MAGIHousehold();
+         applicant: PersonTO() from magi_household.person;
+         eligibility_result: EligibilityResultTO(person == applicant);
+         eval (eligibility_result.xxiIncome - eligibility_result.fivePctDeductedIncome > 0.01d);
+       then       
+         magi_household.fivePctDeduction = 0.0d;
+         EligibilityUtils.debug("MAGI Household of applicant " + applicant.firstName + " does not qualify for the 5% deduction");
+         
+end
+
 rule "DenyMdcdNotApplying"
 	ruleflow-group "nonFinancialMdcd"
 	salience 1000
